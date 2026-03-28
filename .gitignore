@@ -1,0 +1,33 @@
+# 환경변수 (비밀 정보 포함)
+.env
+.env.local
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.venv/
+*.egg-info/
+
+# Node
+node_modules/
+
+# 빌드 결과물
+dist/
+build/
+
+# 에디터 설정
+.vscode/
+.idea/
+
+# OS 파일
+.DS_Store
+Thumbs.db
+
+# bkit / Claude 내부 파일
+.bkit/
+.claude/
+
+# 기타
+docs.zip
