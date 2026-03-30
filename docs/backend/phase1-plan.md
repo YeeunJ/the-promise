@@ -15,7 +15,7 @@
 - 모델 정의: `Building`, `Space`, `Reservation`
 - REST API 구현
 - Django 관리자 화면 등록
-- 초기 데이터: 38개 공간 fixtures
+- 초기 데이터: 44개 공간 fixtures (39개 활성 + 5개 비활성)
 - 로컬 개발 환경: Docker Compose, requirements.txt
 
 ### 제외 (Phase 2 이후)
@@ -82,7 +82,7 @@
 
 ### 6. 초기 데이터 (`reservations/fixtures/rooms.json`)
 
-- 3개 건물, 38개 공간 데이터
+- 3개 건물, 44개 공간 데이터 (39개 활성 + 5개 비활성)
 - `python manage.py loaddata rooms.json` 으로 삽입
 
 ### 7. 인프라 (`infra/`)
@@ -143,8 +143,8 @@
 
 ## 완료 기준
 
-- [ ] `make dev` 실행 시 전체 서비스 정상 기동
-- [ ] `make seed` 실행 시 38개 공간 데이터 삽입
+- [ ] `docker compose up -d` 실행 시 전체 서비스 정상 기동
+- [ ] `python manage.py loaddata rooms.json` 실행 시 44개 공간 데이터 삽입
 - [ ] 예약 신청 API: 중복 없으면 `confirmed`, 있으면 `rejected` 응답
 - [ ] 예약 조회 API: 이름 + 연락처로 본인 예약 목록 반환
 - [ ] 관리자 로그인 → 전체 예약 조회 → 취소 플로우 동작

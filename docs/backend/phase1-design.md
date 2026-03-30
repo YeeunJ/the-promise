@@ -81,12 +81,15 @@ class Reservation(models.Model):
         같은 공간에 시간이 겹치는 confirmed 예약이 존재하면 True.
         판단 기준: 신청 시작 < 기존 종료 AND 신청 종료 > 기존 시작
         """
-        return Reservation.objects.filter(
+        qs = Reservation.objects.filter(
             space=self.space,
             status=Reservation.Status.CONFIRMED,
             start_datetime__lt=self.end_datetime,
             end_datetime__gt=self.start_datetime,
-        ).exists()
+        )
+        if self.pk:
+            qs = qs.exclude(pk=self.pk)
+        return qs.exists()
 ```
 
 ---
@@ -107,7 +110,16 @@ class SpaceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Space
         fields = ["id", "building", "name", "floor", "capacity", "description"]
+
+class BuildingWithSpacesSerializer(serializers.ModelSerializer):
+    spaces = SpaceSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Building
+        fields = ["id", "name", "description", "spaces"]
 ```
+
+> `GET /api/v1/spaces/` 응답에서 건물별 공간 목록을 중첩하여 반환하기 위한 Serializer.
 
 ### ReservationSerializer (응답용)
 
@@ -144,9 +156,9 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
                 "error": "validation_error",
                 "message": "종료 시간은 시작 시간보다 늦어야 합니다.",
             })
-        # 30분 단위 검증
+        # 30분 단위 검증 (total_seconds 사용 — 24시간 초과 시 .seconds는 오작동)
         duration = data["end_datetime"] - data["start_datetime"]
-        if duration.seconds % 1800 != 0:
+        if int(duration.total_seconds()) % 1800 != 0:
             raise serializers.ValidationError({
                 "error": "validation_error",
                 "message": "예약은 30분 단위로만 신청할 수 있습니다.",
@@ -154,12 +166,17 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         return data
 
     def create(self, validated_data):
-        reservation = Reservation(**validated_data)
-        if reservation.has_conflict():
-            reservation.status = Reservation.Status.REJECTED
-        else:
-            reservation.status = Reservation.Status.CONFIRMED
-        reservation.save()
+        with transaction.atomic():
+            # 같은 공간에 대한 동시 요청을 직렬화
+            # select_for_update()로 space row를 잠가 conflict 체크~저장을 원자적으로 처리
+            Space.objects.select_for_update().get(pk=validated_data['space'].pk)
+
+            reservation = Reservation(**validated_data)
+            if reservation.has_conflict():
+                reservation.status = Reservation.Status.REJECTED
+            else:
+                reservation.status = Reservation.Status.CONFIRMED
+            reservation.save()
         return reservation
 ```
 
@@ -175,7 +192,7 @@ class ReservationQuerySerializer(serializers.Serializer):
 
 ```python
 class ReservationCancelSerializer(serializers.Serializer):
-    admin_note = serializers.CharField(required=False, allow_blank=True)
+    admin_note = serializers.CharField(required=False, allow_blank=True, default="")
 ```
 
 ---
@@ -192,12 +209,12 @@ class ReservationCancelSerializer(serializers.Serializer):
 [
   {
     "id": 1,
-    "name": "본관",
+    "name": "본당",
     "description": null,
     "spaces": [
       {
         "id": 1,
-        "building": { "id": 1, "name": "본관", "description": null },
+        "building": { "id": 1, "name": "본당", "description": null },
         "name": "2층 세미나실 A",
         "floor": 2,
         "capacity": 20,
@@ -222,7 +239,7 @@ class ReservationCancelSerializer(serializers.Serializer):
 [
   {
     "id": 10,
-    "space": { "id": 3, "building": { "id": 1, "name": "본관" }, "name": "2층 세미나실 A", ... },
+    "space": { "id": 3, "building": { "id": 1, "name": "본당" }, "name": "자람뜰홀", ... },
     "applicant_name": "홍길동",
     "applicant_phone": "01012345678",
     "applicant_team": "청년부",
@@ -359,6 +376,10 @@ class ReservationCancelSerializer(serializers.Serializer):
 urlpatterns = [
     path("django-admin/", admin.site.urls),
     path("api/v1/", include("reservations.urls")),
+    # API 문서
+    path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
+    path("api/schema/swagger-ui/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
+    path("api/schema/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
 ]
 ```
 
@@ -404,6 +425,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework.authtoken",
     "corsheaders",
+    "drf_spectacular",
     # 로컬
     "reservations",
 ]
@@ -415,14 +437,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.AllowAny",
     ],
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
 DATABASES = {
-    "default": dj_database_url.config(default=env("DATABASE_URL"))
+    "default": dj_database_url.config(default=config("DATABASE_URL"))
 }
 
-CELERY_BROKER_URL = env("REDIS_URL")
-CELERY_RESULT_BACKEND = env("REDIS_URL")
+CELERY_BROKER_URL = config("REDIS_URL")
+CELERY_RESULT_BACKEND = config("REDIS_URL")
 
 TIME_ZONE = "Asia/Seoul"
 USE_TZ = True
@@ -441,7 +464,7 @@ CORS_ALLOWED_ORIGINS = [
   {
     "model": "reservations.building",
     "pk": 1,
-    "fields": { "name": "본관", "description": null, "is_active": true }
+    "fields": { "name": "본당", "description": null, "is_active": true }
   },
   {
     "model": "reservations.space",
