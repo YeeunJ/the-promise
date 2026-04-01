@@ -102,6 +102,24 @@ python manage.py runserver
 
 ---
 
+## 테스트 실행
+
+```bash
+cd apps/api
+source .venv/bin/activate
+python manage.py test reservations
+```
+
+테스트 DB는 실행 시 자동으로 생성되고 종료 시 삭제됩니다. 실서비스 DB에 영향 없음.
+
+```
+Ran 28 tests in ~10s
+
+OK
+```
+
+---
+
 ## 자주 쓰는 명령어
 
 ```bash

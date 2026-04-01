@@ -35,8 +35,9 @@
 - ✅ **자동 승인/거절 로직** 구현: 시간 중복 체크
 - ✅ **동시성 제어** 적용: SELECT FOR UPDATE로 race condition 방지
 - ✅ **44개 공간 Fixtures** 로드 (39개 활성, 5개 비활성)
-- ✅ **API 문서** 자동 생성: drf-spectacular Swagger UI
+- ✅ **API 문서** 자동 생성: drf-spectacular Swagger UI (`/api/schema/swagger-ui/`)
 - ✅ **Match Rate 95%** 달성 (설계 대비)
+- ✅ **테스트 코드 28개** 전체 통과 (표준 수준)
 
 ### 1.3 Value Delivered
 
@@ -108,6 +109,7 @@
 | `reservations/urls.py` | URL 라우팅 | ✅ |
 | `reservations/admin.py` | Django 관리자 화면 | ✅ |
 | `reservations/tasks.py` | Celery 태스크 stub | ✅ |
+| `reservations/tests.py` | 표준 수준 테스트 코드 (28개) | ✅ |
 | `reservations/fixtures/rooms.json` | 44개 공간 초기 데이터 | ✅ |
 | `config/settings.py` | Django 설정 | ✅ |
 | `config/urls.py` | 최상위 라우팅 | ✅ |
@@ -272,12 +274,14 @@ def create(self, validated_data):
 **코드 예시**:
 ```python
 with transaction.atomic():
-    existing = Reservation.objects.select_for_update().filter(
-        space=self.space,
-        status=Reservation.Status.CONFIRMED,
-        start_datetime__lt=self.end_datetime,
-        end_datetime__gt=self.start_datetime,
-    ).exists()
+    # space row를 잠가 conflict 체크~저장을 원자적으로 처리
+    Space.objects.select_for_update().get(pk=validated_data['space'].pk)
+    reservation = Reservation(**validated_data)
+    if reservation.has_conflict():
+        reservation.status = Reservation.Status.REJECTED
+    else:
+        reservation.status = Reservation.Status.CONFIRMED
+    reservation.save()
 ```
 
 ### 3. Token 기반 관리자 인증
@@ -334,13 +338,13 @@ with transaction.atomic():
 
 | 기능 | 상태 | 테스트 |
 |------|------|--------|
-| 공간 조회 | ✅ | 수동 (curl, Postman) |
-| 예약 신청 | ✅ | 수동 (자동 승인/거절 확인) |
-| 예약 조회 | ✅ | 수동 (필터 조건 확인) |
-| 관리자 로그인 | ✅ | 수동 (Token 발급 확인) |
-| 예약 관리 (조회/취소) | ✅ | 수동 (관리자 기능 확인) |
-| 동시성 제어 | ✅ | 수동 (race condition 불발생 확인) |
-| **전체** | **✅** | **통과** |
+| 공간 조회 | ✅ | 자동 (3 케이스) |
+| 예약 신청 | ✅ | 자동 (5 케이스 — 승인/거절/검증) |
+| 예약 조회 | ✅ | 자동 (3 케이스) |
+| 관리자 로그인 | ✅ | 자동 (2 케이스) |
+| 예약 관리 (조회/취소) | ✅ | 자동 (9 케이스) |
+| 모델 충돌 체크 | ✅ | 자동 (6 케이스) |
+| **전체** | **✅** | **28 테스트 통과** |
 
 ### 설계 매칭율
 
@@ -385,10 +389,9 @@ with transaction.atomic():
 
 ### 개선할 점 (Areas for Improvement)
 
-1. **자동화된 테스트 코드 부족**
-   - 현재: 수동 테스트만 수행
-   - 향후: pytest로 유닛/통합 테스트 추가 필요
-   - **영향**: Phase 2 이후 regression 방지
+1. ~~**자동화된 테스트 코드 부족**~~ → **완료**
+   - 표준 수준 테스트 28개 작성 및 전체 통과
+   - 모델 메서드 + 전체 API 엔드포인트 정상/에러 케이스 커버
 
 2. **에러 메시지 상세도**
    - 현재: 기본 메시지만 제공
@@ -469,8 +472,8 @@ with transaction.atomic():
 
 ### API 문서
 
-- **Swagger UI**: `http://localhost:8000/swagger/`
-- **ReDoc**: `http://localhost:8000/redoc/`
+- **Swagger UI**: `http://localhost:8000/api/schema/swagger-ui/`
+- **ReDoc**: `http://localhost:8000/api/schema/redoc/`
 
 ---
 
@@ -518,6 +521,7 @@ Phase 1이 완료되었으므로, Phase 2에서는 다음 기능을 추가합니
 - ✅ **자동 승인/거절 로직** 구현으로 비즈니스 가치 실현
 - ✅ **동시성 제어**로 프로덕션 준비 완료
 - ✅ **API 문서** 자동 생성으로 운영 편의성 확보
+- ✅ **테스트 코드 28개** 작성 완료 (표준 수준)
 
 교회 공간 예약 온라인화의 첫 단계가 완료되었으며, Phase 2에서는 알림 시스템 등 부가 기능을 추가하여 사용자 경험을 더욱 향상시킬 예정입니다.
 
