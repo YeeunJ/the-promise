@@ -92,6 +92,28 @@
 | `docker-compose.yml` | db(PostgreSQL), redis, api(Django), worker(Celery), web(React) 서비스 정의 |
 | `init.sql` | 타임존 설정 (`SET timezone = 'Asia/Seoul'`) |
 
+### 8. 테스트 (`reservations/tests.py`)
+
+- 테스트 범위: 모델 메서드 + 전체 API 엔드포인트 정상/에러 케이스
+- 도구: `django.test.TestCase` + `rest_framework.test.APIClient`
+- 외부 의존성 없음 — Django 내장 테스트 DB 사용 (테스트 실행 시 자동 생성/삭제)
+
+| 테스트 클래스 | 대상 |
+|--------------|------|
+| `HasConflictTest` | `Reservation.has_conflict()` 모델 메서드 |
+| `SpaceListViewTest` | `GET /api/v1/spaces/` |
+| `ReservationCreateTest` | `POST /api/v1/reservations/` |
+| `ReservationListViewTest` | `GET /api/v1/reservations/` |
+| `AdminLoginViewTest` | `POST /api/v1/admin/login/` |
+| `AdminReservationListViewTest` | `GET /api/v1/admin/reservations/` |
+| `AdminReservationCancelViewTest` | `POST /api/v1/admin/reservations/<id>/cancel/` |
+
+실행 명령어:
+
+```bash
+python manage.py test reservations
+```
+
 ---
 
 ## 구현 순서
@@ -114,6 +136,8 @@
 8. reservations/admin.py
       ↓
 9. reservations/tasks.py (Celery 태스크 stub — Phase 2에서 구현)
+      ↓
+10. reservations/tests.py (표준 수준 테스트)
 ```
 
 > 설정 → 모델 → 데이터 → API → 관리자 순서로 아래로 쌓아올립니다.
@@ -149,3 +173,4 @@
 - [ ] 예약 조회 API: 이름 + 연락처로 본인 예약 목록 반환
 - [ ] 관리자 로그인 → 전체 예약 조회 → 취소 플로우 동작
 - [ ] Django 관리자 화면(`/django-admin`)에서 예약 CRUD 가능
+- [ ] `python manage.py test reservations` 전체 통과

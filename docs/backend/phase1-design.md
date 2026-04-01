@@ -503,6 +503,81 @@ COPY . .
 
 ---
 
+## 테스트 설계 (`reservations/tests.py`)
+
+### 구조
+
+- 테스트 DB는 Django가 자동으로 생성/삭제 — 실서비스 DB에 영향 없음
+- `BaseTestCase`에서 공통 픽스처(건물, 공간, 관리자 계정) 생성
+- 각 테스트 클래스는 `BaseTestCase`를 상속
+
+### 테스트 케이스 목록
+
+#### `HasConflictTest` — 모델 메서드
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 예약 없을 때 | `False` |
+| 시간 겹칠 때 | `True` |
+| 인접 시간 (끝나는 순간 = 시작) | `False` |
+| 거절된 예약과 겹칠 때 | `False` (거절은 충돌 대상 아님) |
+| 자기 자신과 비교 | `False` (self-exclusion) |
+| 다른 공간의 같은 시간 | `False` |
+
+#### `SpaceListViewTest` — `GET /api/v1/spaces/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 활성 건물·공간 반환 | 200, 공간 포함 |
+| 비활성 공간 제외 | 응답에 없음 |
+| 비활성 건물 제외 | 응답에 없음 |
+
+#### `ReservationCreateTest` — `POST /api/v1/reservations/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 중복 없음 | 201, `status: confirmed` |
+| 시간 중복 | 201, `status: rejected` |
+| 거절돼도 레코드 저장 | DB에 `rejected` 1건 존재 |
+| 종료 < 시작 | 400, `error: validation_error` |
+| 30분 단위 아님 | 400, `error: validation_error` |
+
+#### `ReservationListViewTest` — `GET /api/v1/reservations/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 이름+연락처 일치 | 200, 해당 예약 반환 |
+| 연락처 불일치 | 200, 빈 배열 |
+| 파라미터 누락 | 400, `error: validation_error` |
+
+#### `AdminLoginViewTest` — `POST /api/v1/admin/login/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 올바른 계정 | 200, `token` 포함 |
+| 틀린 비밀번호 | 401, `error: unauthorized` |
+
+#### `AdminReservationListViewTest` — `GET /api/v1/admin/reservations/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 토큰 있음 | 200, 전체 목록 |
+| 토큰 없음 | 401 |
+| `date` 필터 | 해당 날짜 예약만 |
+| `status` 필터 | 해당 상태 예약만 |
+
+#### `AdminReservationCancelViewTest` — `POST /api/v1/admin/reservations/<id>/cancel/`
+
+| 케이스 | 기댓값 |
+|--------|--------|
+| 정상 취소 | 200, `status: cancelled` |
+| `admin_note` 없이 취소 | 200 (선택 필드) |
+| 이미 취소된 예약 | 400, `error: already_cancelled` |
+| 존재하지 않는 예약 | 404, `error: not_found` |
+| 토큰 없음 | 401 |
+
+---
+
 ## 완료 기준 (Design 관점)
 
 - [ ] 모델 3개 (`Building`, `Space`, `Reservation`) 정의 완료
@@ -511,3 +586,4 @@ COPY . .
 - [ ] 뷰는 단순 위임 — 비즈니스 로직이 뷰에 없음
 - [ ] 관리자 엔드포인트는 `TokenAuthentication`으로 보호
 - [ ] Docker Compose로 로컬 전체 서비스 기동 가능
+- [ ] `python manage.py test reservations` 전체 통과
