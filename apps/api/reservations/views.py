@@ -1,5 +1,5 @@
 from django.contrib.auth import authenticate
-from drf_spectacular.utils import extend_schema, inline_serializer
+from drf_spectacular.utils import OpenApiParameter, extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
@@ -17,6 +17,7 @@ from .serializers import (
 
 
 class SpaceListView(APIView):
+    @extend_schema(responses=BuildingWithSpacesSerializer(many=True))
     def get(self, request):
         buildings = (
             Building.objects
@@ -33,6 +34,13 @@ class SpaceListView(APIView):
 
 
 class ReservationListCreateView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="name", type=str, required=True, description="신청자 이름"),
+            OpenApiParameter(name="phone", type=str, required=True, description="신청자 연락처"),
+        ],
+        responses=ReservationSerializer(many=True),
+    )
     def get(self, request):
         query_serializer = ReservationQuerySerializer(data=request.query_params)
         if not query_serializer.is_valid():
@@ -47,6 +55,7 @@ class ReservationListCreateView(APIView):
         serializer = ReservationSerializer(reservations, many=True)
         return Response(serializer.data)
 
+    @extend_schema(request=ReservationCreateSerializer, responses={201: ReservationSerializer})
     def post(self, request):
         serializer = ReservationCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -87,6 +96,13 @@ class AdminLoginView(APIView):
 class AdminReservationListView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="date", type=str, required=False, description="날짜 필터 (예: 2026-04-01)"),
+            OpenApiParameter(name="status", type=str, required=False, description="상태 필터 (confirmed / rejected / cancelled / pending)"),
+        ],
+        responses=ReservationSerializer(many=True),
+    )
     def get(self, request):
         qs = Reservation.objects.select_related("space__building")
         date = request.query_params.get("date")
@@ -102,6 +118,7 @@ class AdminReservationListView(APIView):
 class AdminReservationCancelView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(request=ReservationCancelSerializer, responses=ReservationSerializer)
     def post(self, request, pk):
         try:
             reservation = Reservation.objects.get(pk=pk)
