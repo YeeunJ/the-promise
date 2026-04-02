@@ -1,5 +1,6 @@
 from django.contrib.auth import authenticate
-from rest_framework import status
+from drf_spectacular.utils import extend_schema, inline_serializer
+from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -57,6 +58,19 @@ class ReservationListCreateView(APIView):
 
 
 class AdminLoginView(APIView):
+    @extend_schema(
+        request=inline_serializer(
+            name="AdminLoginRequest",
+            fields={
+                "username": serializers.CharField(),
+                "password": serializers.CharField(),
+            },
+        ),
+        responses=inline_serializer(
+            name="AdminLoginResponse",
+            fields={"token": serializers.CharField()},
+        ),
+    )
     def post(self, request):
         username = request.data.get("username")
         password = request.data.get("password")
