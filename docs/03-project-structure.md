@@ -80,22 +80,33 @@ apps/api/
 ```
 apps/web/
 ├── index.html                            ← Vite 진입점 (public/ 아닌 루트에 위치)
+├── tailwind.config.js                    ← Tailwind CSS 설정 (content 경로 지정)
+├── postcss.config.js                     ← PostCSS 설정 (tailwindcss, autoprefixer)
+├── vite.config.ts                        ← Vite 빌드/개발 서버 설정
 ├── public/
 │   └── favicon.ico                       ← 정적 자산 (빌드 시 그대로 복사됨)
 ├── src/
+│   ├── index.css                         ← Tailwind 지시어(@tailwind) + 전역 스타일
 │   ├── pages/
-│   │   ├── ReservationPage.tsx           ← 예약 신청 + 조회 페이지
+│   │   ├── ReservationPage.tsx           ← 예약 신청 + 조회 탭 통합 페이지
 │   │   └── AdminPage.tsx                 ← 관리자 달력 + 예약 목록 페이지
 │   ├── components/
-│   │   ├── ReservationForm.tsx           ← 예약 신청 입력 폼
+│   │   ├── ReservationForm.tsx           ← 예약 신청 입력 폼 (전체 폼 조합)
+│   │   ├── ApplicantFields.tsx           ← 신청자 정보 필드 그룹 (이름/연락처/단체명/책임자)
+│   │   ├── SpaceSelector.tsx             ← 3단계 장소 선택 컴포넌트 (건물→층→공간)
 │   │   ├── TimeSlotPicker.tsx            ← 30분 단위 시간 선택 UI
-│   │   └── ReservationTable.tsx          ← 예약 목록 테이블
+│   │   ├── ReservationSummary.tsx        ← 예약 완료 후 내용 요약 카드
+│   │   ├── LookupForm.tsx                ← 이름+연락처로 예약 조회하는 폼
+│   │   └── ReservationTable.tsx          ← 예약 목록 테이블 (모바일: 카드 리스트)
+│   ├── types/
+│   │   └── index.ts                      ← 프론트엔드 공용 TypeScript 타입 정의
 │   ├── utils/
 │   │   ├── formatDatetime.ts             ← ISO 8601 날짜를 사람이 읽기 쉬운 형식으로 변환
-│   │   └── formatPhone.ts               ← 전화번호 형식 변환 (010-0000-0000)
+│   │   ├── formatPhone.ts               ← 전화번호 형식 변환 (010-0000-0000)
+│   │   └── reservationFormHelpers.ts     ← 폼 유효성 검사, 초기값 상수
 │   ├── App.tsx                           ← 라우터 설정 (페이지 연결)
 │   └── main.tsx                          ← React 앱 진입점 (index.html과 연결)
-├── tsconfig.json                         ← TypeScript 컴파일 설정
+├── tsconfig.json                         ← TypeScript 컴파일 설정 (path alias @/ 포함)
 └── package.json                          ← frontend 의존성 및 스크립트
 ```
 
@@ -103,19 +114,43 @@ apps/web/
 
 | 파일 | 역할 |
 |------|------|
-| `index.html` | Vite가 빌드 시 기준으로 삼는 HTML. `<div id="root">`와 `main.tsx` 스크립트 태그 포함 |
-| `src/main.tsx` | `ReactDOM.createRoot()`로 React 앱을 `#root`에 마운트하는 진입점 |
-| `src/App.tsx` | URL 경로별로 어떤 페이지 컴포넌트를 렌더링할지 라우터로 정의 |
+| `index.html` | Vite가 빌드 시 기준으로 삼는 HTML. `<div id="root">`와 `main.tsx` 스크립트 태그 포함. `<html lang="ko">` |
+| `src/main.tsx` | `ReactDOM.createRoot()`로 React 앱을 `#root`에 마운트하는 진입점. `BrowserRouter` 래핑 포함 |
+| `src/App.tsx` | URL 경로별로 어떤 페이지 컴포넌트를 렌더링할지 라우터로 정의. 현재 `/` → `ReservationPage` |
+| `src/index.css` | `@tailwind base/components/utilities` 지시어와 전역 body 폰트(Pretendard) 정의 |
 | `src/pages/` | URL 하나에 대응하는 화면 전체. 여러 컴포넌트를 조합해 한 페이지를 구성 |
-| `src/components/` | 여러 페이지에서 재사용되거나 독립적인 UI 단위. 페이지보다 작은 단위 |
-| `src/components/ReservationForm.tsx` | 신청자 이름, 연락처, 팀, 공간 선택, 목적 입력 폼 |
-| `src/components/TimeSlotPicker.tsx` | 30분 단위로 시작/종료 시간을 선택하는 UI |
-| `src/components/ReservationTable.tsx` | 예약 목록을 표 형태로 보여주는 컴포넌트 |
-| `src/utils/formatDatetime.ts` | ISO 8601 날짜 문자열을 화면에 표시할 형식으로 변환하는 순수 함수 |
-| `src/utils/formatPhone.ts` | 전화번호 문자열을 `010-0000-0000` 형식으로 변환하는 순수 함수 |
+| `src/components/ReservationForm.tsx` | 예약 신청 전체 폼. `ApplicantFields`, `SpaceSelector`, `TimeSlotPicker`를 조합하고 API 제출을 담당 |
+| `src/components/ApplicantFields.tsx` | 신청자 이름, 연락처, 단체명, 책임자 연락처 필드 그룹. `ReservationForm`에서 분리된 컴포넌트 |
+| `src/components/SpaceSelector.tsx` | 건물→층→공간 3단계 progressive disclosure 선택 UI. 내부에서 `GET /api/v1/spaces/` 호출 |
+| `src/components/TimeSlotPicker.tsx` | 날짜 선택 후 30분 단위 슬롯 버튼 그리드 표시. 시작→종료 순서로 2번 클릭해 범위 선택 |
+| `src/components/ReservationSummary.tsx` | 신청 완료 후 예약 내용 요약 카드. `status`에 따라 확정/거절 배너 표시 |
+| `src/components/LookupForm.tsx` | 이름+연락처 입력 폼. 제출 시 `GET /api/v1/reservations/?name=&phone=` 호출 |
+| `src/components/ReservationTable.tsx` | 예약 목록을 표 형태로 표시 (데스크탑). 모바일에서는 카드 리스트로 전환 |
+| `src/types/index.ts` | `Reservation`, `ReservationFormData`, `Building`, `Space`, `BuildingWithSpaces` 등 API 응답·요청 타입 정의 |
+| `src/utils/formatDatetime.ts` | ISO 8601 날짜 문자열을 화면에 표시할 형식으로 변환하는 순수 함수 4개 |
+| `src/utils/formatPhone.ts` | 전화번호 문자열을 `010-0000-0000` 형식으로 변환하는 순수 함수 2개 |
+| `src/utils/reservationFormHelpers.ts` | `PHONE_REGEX`, `INITIAL_FORM_DATA`, `INITIAL_TIME_SLOT` 상수와 `validateReservationForm` 함수 |
 
 > **`index.html`이 `public/`이 아닌 루트에 있는 이유**
 > Vite는 `public/`을 정적 자산 폴더로 사용하고, `index.html`은 빌드 진입점으로 프로젝트 루트에 둡니다. `public/index.html`로 두면 Vite가 인식하지 못합니다.
+
+### 컴포넌트 구조도
+
+```
+ReservationPage (페이지)
+├── 탭 UI ("예약 신청" / "내 예약 조회")
+│
+├── [예약 신청 탭]
+│   ├── ReservationForm
+│   │   ├── ApplicantFields (이름/연락처/단체명/책임자)
+│   │   ├── SpaceSelector (건물→층→공간, 내부에서 GET /api/v1/spaces/ 호출)
+│   │   └── TimeSlotPicker (날짜 + 30분 단위 슬롯)
+│   └── ReservationSummary (신청 완료 후 표시, status 배너 포함)
+│
+└── [내 예약 조회 탭]
+    ├── LookupForm (이름+연락처 입력, GET /api/v1/reservations/ 호출)
+    └── ReservationTable (status 배지 포함, 모바일 카드 리스트)
+```
 
 ---
 
@@ -132,7 +167,7 @@ packages/shared/
 
 | 파일 | 역할 |
 |------|------|
-| `constants/reservation.ts` | `RESERVATION_STATUS`, `TIME_SLOT_MINUTES` 등 프론트엔드에서 쓰는 상수. 백엔드 Python과 공유 불가이므로 JS/TS 전용 |
+| `constants/reservation.ts` | `HEADCOUNT_OPTIONS` (인원 드롭다운 옵션 배열), `TIME_SLOT_MINUTES` (30) 등 프론트엔드에서 쓰는 상수. 백엔드 Python과 공유 불가이므로 JS/TS 전용 |
 
 > **왜 `rooms.ts`는 없나?**
 > 공간 데이터는 DB가 단일 소스입니다. 프론트엔드는 API로 공간 목록을 조회하고, 백엔드는 `fixtures/rooms.json`으로 DB에 초기 데이터를 삽입합니다. JS 파일로 별도 정의하면 DB와 불일치할 위험이 생깁니다.
@@ -175,13 +210,23 @@ infra/
 
 ```
 /api/v1/
-    spaces/                         ← 건물 + 공간 목록 조회
-    reservations/                   ← 예약 생성, 조회
+    spaces/                         ← GET: 건물+공간 목록 조회 (BuildingWithSpaces[] 반환)
+    reservations/                   ← POST: 예약 신청 / GET: 이름+연락처로 예약 조회
     admin/
         login/                      ← 관리자 로그인
         reservations/               ← 전체 예약 조회
         reservations/<id>/cancel/   ← 예약 취소
 ```
+
+### 엔드포인트 상세
+
+| 메서드 | 경로 | 설명 |
+|--------|------|------|
+| GET | `/api/v1/spaces/` | 건물+공간 목록 반환. 응답 타입: `BuildingWithSpaces[]`. 층 그룹핑은 클라이언트(SpaceSelector)에서 처리 |
+| POST | `/api/v1/reservations/` | 예약 신청. 충돌 없으면 `status: "confirmed"`, 시간 충돌 시 `status: "rejected"` 자동 설정. 응답: 201 |
+| GET | `/api/v1/reservations/?name=&phone=` | 이름+연락처로 본인 예약 조회. `name`과 `phone` 쿼리 파라미터 둘 다 필수 |
+
+> **시간 슬롯 가용 여부 API (`GET /api/v1/spaces/{id}/availability/`)는 미구현 상태입니다.** Phase 2 이후 구현 예정. 현재 `TimeSlotPicker`는 모든 슬롯을 활성화 표시하며, 중복 신청이 들어오면 백엔드가 `rejected`로 자동 처리합니다.
 
 ---
 
@@ -202,8 +247,11 @@ ADMIN_USERNAME=admin
 ADMIN_PASSWORD=change-this-password
 
 # React (Vite)
-VITE_API_BASE_URL=http://localhost:8000/api/v1
+VITE_API_BASE_URL=http://localhost:8000
 ```
 
 > **`VITE_` 접두사가 붙는 이유**
 > Vite는 보안상 `VITE_`로 시작하는 환경변수만 클라이언트 코드에 노출합니다. 접두사 없이 정의한 변수는 브라우저에서 접근할 수 없습니다.
+
+> **`VITE_API_BASE_URL`에 `/api/v1`을 포함하지 않는 이유**
+> 각 컴포넌트(`SpaceSelector`, `ReservationForm`, `LookupForm`)가 axios 호출 시 `${VITE_API_BASE_URL}/api/v1/...` 형태로 경로를 직접 명시합니다. 환경변수에 `/api/v1`을 포함하면 URL이 이중으로 붙는 버그가 발생합니다.
