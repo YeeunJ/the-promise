@@ -133,9 +133,36 @@ class ReservationSerializer(serializers.ModelSerializer):
             "id", "space", "applicant_name", "applicant_phone",
             "applicant_team", "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
-            "status", "created_at",
+            "status", "admin_note", "created_at",
         ]
 ```
+
+### 예외 처리 설계
+
+#### 날짜 형식 검증 (views)
+
+`AdminReservationListView`, `SpaceReservationListView`에서 `date` 파라미터를 받을 때 형식 검증:
+
+```python
+import datetime
+
+try:
+    datetime.date.fromisoformat(date)
+except ValueError:
+    return Response(
+        {"error": "validation_error", "message": "날짜 형식이 올바르지 않습니다. (예: 2026-04-01)"},
+        status=400,
+    )
+```
+
+#### 예약 신청 추가 검증 (ReservationCreateSerializer.validate)
+
+| 조건 | 에러 메시지 |
+|------|------------|
+| `space.is_active=False` | "예약이 불가능한 공간입니다." |
+| `start_datetime < now` | "과거 시간으로는 예약할 수 없습니다." |
+
+---
 
 ### ReservationCreateSerializer (신청 입력 + 자동 승인/거절)
 
@@ -366,6 +393,54 @@ class ReservationCancelSerializer(serializers.Serializer):
 }
 ```
 
+**에러 — 거절된 예약 취소 시도 (400)**
+
+```json
+{
+  "error": "cannot_cancel_rejected",
+  "message": "거절된 예약은 취소할 수 없습니다."
+}
+```
+
+---
+
+### GET `/api/v1/spaces/<id>/reservations/?date=YYYY-MM-DD`
+
+특정 날짜에 해당 공간의 confirmed 예약 목록을 반환합니다.
+프론트엔드에서 날짜별 예약 현황(점유 시간)을 표시하기 위한 API입니다.
+
+**쿼리 파라미터**
+
+| 파라미터 | 필수 | 설명 |
+|---------|------|------|
+| `date` | ✅ | 조회할 날짜 (예: `2026-04-10`) |
+
+**응답 예시 (200)**
+
+```json
+[
+  {
+    "start_datetime": "2026-04-10T10:00:00+09:00",
+    "end_datetime": "2026-04-10T12:00:00+09:00"
+  },
+  {
+    "start_datetime": "2026-04-10T14:00:00+09:00",
+    "end_datetime": "2026-04-10T15:30:00+09:00"
+  }
+]
+```
+
+**에러 — date 파라미터 누락 (400)**
+
+```json
+{
+  "error": "validation_error",
+  "message": "date 파라미터가 필요합니다."
+}
+```
+
+> `confirmed` 상태의 예약만 반환합니다. `rejected`, `cancelled`는 제외됩니다.
+
 ---
 
 ## URL 설계
@@ -392,6 +467,7 @@ urlpatterns = [
     path("admin/login/",                          AdminLoginView.as_view()),
     path("admin/reservations/",                   AdminReservationListView.as_view()),
     path("admin/reservations/<int:pk>/cancel/",   AdminReservationCancelView.as_view()),
+    path("spaces/<int:pk>/reservations/",         SpaceReservationListView.as_view()),
 ]
 ```
 

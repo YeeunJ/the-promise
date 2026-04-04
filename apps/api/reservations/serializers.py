@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 from .models import Building, Space, Reservation
 
@@ -48,6 +49,16 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, data):
+        if not data["space"].is_active:
+            raise serializers.ValidationError({
+                "error": "validation_error",
+                "message": "예약이 불가능한 공간입니다.",
+            })
+        if data["start_datetime"] < timezone.now():
+            raise serializers.ValidationError({
+                "error": "validation_error",
+                "message": "과거 시간으로는 예약할 수 없습니다.",
+            })
         if data["end_datetime"] <= data["start_datetime"]:
             raise serializers.ValidationError({
                 "error": "validation_error",
@@ -84,3 +95,9 @@ class ReservationQuerySerializer(serializers.Serializer):
 
 class ReservationCancelSerializer(serializers.Serializer):
     admin_note = serializers.CharField(required=False, allow_blank=True, default="")
+
+
+class SpaceOccupiedSlotSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reservation
+        fields = ["start_datetime", "end_datetime"]
