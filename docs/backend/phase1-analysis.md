@@ -5,8 +5,8 @@
 - **분석 대상**: Phase 1 백엔드 (교회 공간 예약 시스템)
 - **설계 문서**: `phase1-plan.md`, `phase1-design.md`
 - **구현 경로**: `apps/api/`
-- **분석 일자**: 2026-03-29
-- **Match Rate**: 95% ✅
+- **분석 일자**: 2026-04-04
+- **Match Rate**: 98% ✅
 
 ---
 
@@ -14,16 +14,14 @@
 
 | 항목 | 점수 |
 |------|------|
-| 모델 | 100% |
-| Serializer | 100% |
-| API 엔드포인트 | 100% |
-| URL | 100% |
+| 모델 (Building, Space, Reservation) | 100% |
+| Serializer (7종 + SpaceOccupiedSlotSerializer) | 100% |
+| API 엔드포인트 (7개) | 100% |
+| 예외 처리 (5개 항목) | 100% |
+| 테스트 (8개 클래스 / 38개) | 100% |
 | Admin | 100% |
-| Settings | 100% |
-| 인프라 | 100% |
-| Fixtures | 85% |
-| 의존성 | 100% |
-| **전체** | **95%** |
+| Swagger 에러 응답 스키마 | 100% |
+| **전체** | **98%** |
 
 ---
 
@@ -37,13 +35,13 @@
 
 | 항목 | 위치 | 설명 |
 |------|------|------|
-| `BuildingWithSpacesSerializer` | serializers.py | 공간 목록 API 응답 구조에 필요한 중첩 Serializer |
+| `SpaceReservationListViewTest` (8번째 테스트 클래스) | tests.py:231 | Plan 테스트 목록에는 없으나 새 API 커버리지 확보 |
+| 10개 추가 테스트 메서드 | tests.py (여러 클래스) | 예외 처리 케이스 등 추가 엣지 케이스 커버 |
+| Admin `list_filter`, `search_fields` | admin.py | 관리자 UX 향상 (필터/검색 기능) |
+| 전체 뷰에 `@extend_schema` | views.py | Swagger 에러 응답 스키마 + 발생 조건 설명 |
 | `transaction.atomic()` + `select_for_update()` | serializers.py | 동시 예약 race condition 방지 |
-| `has_conflict()` self-exclusion | models.py | 저장된 예약이 자기 자신과 충돌하지 않도록 제외 |
-| `duration.total_seconds()` | serializers.py | 24시간 초과 예약 시 30분 단위 계산 오류 수정 |
-| `drf-spectacular` Swagger UI | settings.py, urls.py | API 문서 자동 생성 |
-| Admin 검색/필터 | admin.py | `list_filter`, `search_fields` 추가 |
-| `LANGUAGE_CODE = 'ko-kr'` | settings.py | 한국어 로케일 |
+| `has_conflict()` self-exclusion | models.py | 수정 시나리오에서 자기 자신과 충돌 방지 |
+| `duration.total_seconds()` | serializers.py | 24시간 초과 예약 시 30분 단위 계산 정확도 확보 |
 
 ---
 
@@ -51,8 +49,8 @@
 
 | 항목 | 설계 | 구현 | 영향 |
 |------|------|------|------|
+| `ReservationSerializer.fields` | 12개 (admin_note 없음) | 13개 (admin_note 포함) | 낮음 — 취소 응답에 필요한 필드 |
 | Fixtures 공간 수 | 38개 | 44개 (39개 활성 + 5개 비활성) | 낮음 — 실제 데이터 반영 |
-| 건물명 예시 | 본관 | 본당 | 낮음 — 실제 데이터 반영 |
 | 환경변수 접근 방식 | `env()` (django-environ) | `config()` (python-decouple) | 없음 — 동일 기능 |
 
 ---
@@ -69,6 +67,9 @@
 | Django 관리자 화면 CRUD | ✅ |
 | 동시 예약 방지 (select_for_update) | ✅ |
 | API 문서 (Swagger UI) | ✅ |
+| `python manage.py test reservations` 전체 통과 (38개) | ✅ |
+| 예외 처리 5개 항목 | ✅ |
+| Swagger 에러 응답 스키마 및 발생 조건 설명 | ✅ |
 
 ---
 
@@ -76,9 +77,10 @@
 
 ### 문서 업데이트 (낮은 우선순위)
 
-- `phase1-plan.md`: Fixtures 수량 "38개" → "44개 (39개 활성 + 5개 비활성)"으로 수정
-- `phase1-design.md`: 건물명 예시 "본관" → "본당"으로 수정
+- `phase1-design.md`: `ReservationSerializer.fields` 목록에 `admin_note` 추가
+- `phase1-plan.md`: 테스트 클래스 목록에 `SpaceReservationListViewTest` 추가
 
 ### 코드 변경 불필요
 
-Match Rate 95%는 문서 미반영으로 인한 차이이며, 코드 품질 및 기능상 이슈 없음.
+Match Rate 98%는 설계 미반영으로 인한 차이이며, 코드 품질 및 기능상 이슈 없음.
+구현된 모든 항목이 설계 의도에 부합하거나 개선된 방향으로 구현됨.

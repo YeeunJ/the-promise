@@ -128,6 +128,7 @@
 | `AdminLoginViewTest` | `POST /api/v1/admin/login/` |
 | `AdminReservationListViewTest` | `GET /api/v1/admin/reservations/` |
 | `AdminReservationCancelViewTest` | `POST /api/v1/admin/reservations/<id>/cancel/` |
+| `SpaceReservationListViewTest` | `GET /api/v1/spaces/<id>/reservations/` |
 
 실행 명령어:
 

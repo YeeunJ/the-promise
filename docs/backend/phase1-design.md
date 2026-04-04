@@ -133,7 +133,7 @@ class ReservationSerializer(serializers.ModelSerializer):
             "id", "space", "applicant_name", "applicant_phone",
             "applicant_team", "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
-            "status", "created_at",
+            "status", "admin_note", "created_at",
         ]
 ```
 
