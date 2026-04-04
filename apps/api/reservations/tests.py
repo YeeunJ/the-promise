@@ -35,7 +35,7 @@ class BaseTestCase(TestCase):
         self.token = Token.objects.create(user=self.admin)
 
     def _make_dt(self, hour, minute=0, day=1):
-        return timezone.make_aware(datetime.datetime(2026, 4, day, hour, minute))
+        return timezone.make_aware(datetime.datetime(2030, 6, day, hour, minute))
 
     def _make_reservation(
         self,
@@ -187,6 +187,21 @@ class ReservationCreateTest(BaseTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("validation_error", response.data["error"])
 
+    def test_validation_error_inactive_space(self):
+        payload = self._payload()
+        payload["space"] = self.inactive_space.pk
+        response = self.client.post("/api/v1/reservations/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("validation_error", response.data["error"])
+
+    def test_validation_error_past_datetime(self):
+        payload = self._payload()
+        payload["start_datetime"] = "2020-01-01T10:00:00+09:00"
+        payload["end_datetime"] = "2020-01-01T12:00:00+09:00"
+        response = self.client.post("/api/v1/reservations/", payload, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("validation_error", response.data["error"])
+
 
 class ReservationListViewTest(BaseTestCase):
     """GET /api/v1/reservations/"""
@@ -209,6 +224,45 @@ class ReservationListViewTest(BaseTestCase):
 
     def test_400_when_params_missing(self):
         response = self.client.get("/api/v1/reservations/")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+
+class SpaceReservationListViewTest(BaseTestCase):
+    """GET /api/v1/spaces/<id>/reservations/?date="""
+
+    def test_returns_confirmed_reservations_for_date(self):
+        self._make_reservation(start_hour=10, end_hour=12)
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "2030-06-01"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 1)
+        self.assertIn("start_datetime", response.data[0])
+        self.assertIn("end_datetime", response.data[0])
+
+    def test_excludes_rejected_reservations(self):
+        self._make_reservation(status=Reservation.Status.REJECTED)
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "2030-06-01"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
+
+    def test_excludes_other_dates(self):
+        self._make_reservation(day=1)
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "2030-06-02"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
+
+    def test_400_when_date_missing(self):
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_404_when_space_not_found(self):
+        response = self.client.get("/api/v1/spaces/9999/reservations/", {"date": "2030-06-01"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
+
+    def test_400_when_date_format_invalid(self):
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "abc"})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
@@ -256,9 +310,15 @@ class AdminReservationListViewTest(BaseTestCase):
     def test_filter_by_date(self):
         self._make_reservation(day=1)
         self._make_reservation(start_hour=14, end_hour=16, day=2)
-        response = self.client.get("/api/v1/admin/reservations/", {"date": "2026-04-01"})
+        response = self.client.get("/api/v1/admin/reservations/", {"date": "2030-06-01"})
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 1)
+
+    def test_400_when_date_format_invalid(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        response = self.client.get("/api/v1/admin/reservations/", {"date": "abc"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
 
     def test_filter_by_status(self):
         self._make_reservation(status=Reservation.Status.CONFIRMED)
@@ -302,6 +362,14 @@ class AdminReservationCancelViewTest(BaseTestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "already_cancelled")
+
+    def test_rejected_reservation_cannot_be_cancelled(self):
+        r = self._make_reservation(status=Reservation.Status.REJECTED)
+        response = self.client.post(
+            f"/api/v1/admin/reservations/{r.pk}/cancel/", {}, format="json"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "cannot_cancel_rejected")
 
     def test_not_found_returns_404(self):
         response = self.client.post(
