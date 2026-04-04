@@ -58,3 +58,11 @@ export function generateTimeSlots(date: string): string[] {
   }
   return slots;
 }
+
+/**
+ * ISO 8601 문자열에서 날짜 부분("YYYY-MM-DD")만 추출
+ * 예: "2026-04-10T13:00:00+09:00" → "2026-04-10"
+ */
+export function extractDateStr(isoString: string): string {
+  return isoString.slice(0, 10);
+}

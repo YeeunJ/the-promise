@@ -57,3 +57,19 @@ export interface TimeSlotValue {
   startTime: string;
   endTime: string;
 }
+
+export interface AdminLoginRequest {
+  username: string;
+  password: string;
+}
+
+export interface AdminLoginResponse {
+  token: string;
+}
+
+export const ADMIN_TOKEN_KEY = 'admin_token';
+
+export interface UpdateReservationStatusPayload {
+  status: 'confirmed' | 'rejected' | 'cancelled';
+  admin_note?: string;
+}
