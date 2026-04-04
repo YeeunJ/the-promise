@@ -11,10 +11,10 @@ interface StatusBadgeConfig {
 }
 
 const STATUS_BADGE: Record<ReservationStatus, StatusBadgeConfig> = {
-  confirmed: { label: '확정', className: 'bg-green-100 text-green-800' },
-  rejected:  { label: '거절', className: 'bg-red-100 text-red-800' },
-  cancelled: { label: '취소', className: 'bg-gray-100 text-gray-800' },
-  pending:   { label: '대기', className: 'bg-yellow-100 text-yellow-800' },
+  confirmed: { label: '확정', className: 'bg-[#008F49]/10 text-[#008F49] border border-[#008F49]/30' },
+  rejected:  { label: '거절', className: 'bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30' },
+  cancelled: { label: '취소', className: 'bg-[#E5E7EB] text-gray-600 border border-gray-300' },
+  pending:   { label: '대기', className: 'bg-[#AAA014]/10 text-[#AAA014] border border-[#AAA014]/30' },
 };
 
 function formatSpaceName(space: Reservation['space']): string {
@@ -35,13 +35,13 @@ function StatusBadge({ status }: { status: ReservationStatus }) {
 
 function ReservationCard({ reservation }: { reservation: Reservation }): JSX.Element {
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 shadow-sm space-y-2">
+    <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-sm space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-500">No. {reservation.id}</span>
+        <span className="text-xs text-[#BC8A5F]">No. {reservation.id}</span>
         <StatusBadge status={reservation.status} />
       </div>
       <div>
-        <p className="text-sm font-medium text-gray-900">
+        <p className="text-sm font-medium text-black">
           {formatSpaceName(reservation.space)}
         </p>
         <p className="text-sm text-gray-600 mt-0.5">
@@ -77,22 +77,22 @@ function ReservationTable({ reservations }: ReservationTableProps): JSX.Element 
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider w-16">
                 번호
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider">
                 공간
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider">
                 날짜·시간
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider w-20">
                 인원
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider">
                 사용목적
               </th>
-              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-20">
+              <th className="px-4 py-3 text-left text-xs font-medium text-[#BC8A5F] uppercase tracking-wider w-20">
                 상태
               </th>
             </tr>
@@ -100,22 +100,22 @@ function ReservationTable({ reservations }: ReservationTableProps): JSX.Element 
           <tbody className="bg-white divide-y divide-gray-200">
             {reservations.map((reservation) => (
               <tr key={reservation.id} className="hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-gray-500">
+                <td className="px-4 py-3 text-sm text-[#BC8A5F]">
                   {reservation.id}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
+                <td className="px-4 py-3 text-sm text-black">
                   {formatSpaceName(reservation.space)}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap">
+                <td className="px-4 py-3 text-sm text-black whitespace-nowrap">
                   {formatDatetimeRange(
                     reservation.start_datetime,
                     reservation.end_datetime
                   )}
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900">
+                <td className="px-4 py-3 text-sm text-black">
                   {reservation.headcount}명
                 </td>
-                <td className="px-4 py-3 text-sm text-gray-900 max-w-xs truncate">
+                <td className="px-4 py-3 text-sm text-black max-w-xs truncate">
                   {reservation.purpose}
                 </td>
                 <td className="px-4 py-3 text-sm">

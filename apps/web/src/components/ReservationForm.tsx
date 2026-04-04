@@ -19,7 +19,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
   const [errors, setErrors] = useState<Partial<Record<keyof ReservationFormData, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function handleTextChange(field: 'applicant_name' | 'applicant_team' | 'purpose') {
+  function handleTextChange(field: 'purpose') {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       setFormData((prev) => ({ ...prev, [field]: e.target.value }));
       setErrors((prev) => ({ ...prev, [field]: undefined }));
@@ -107,26 +107,26 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
 
       {/* 장소 */}
       <div>
-        <p className="block text-sm font-medium text-gray-700 mb-1">
-          장소 <span className="text-red-500">*</span>
+        <p className="block text-sm font-medium text-black mb-1">
+          장소 <span className="text-[#DC2626]">*</span>
         </p>
         <SpaceSelector value={spaceIdForPicker} onChange={handleSpaceChange} />
         {errors.space && (
-          <p className="mt-1 text-xs text-red-500">{errors.space}</p>
+          <p className="mt-1 text-xs text-[#DC2626]">{errors.space}</p>
         )}
       </div>
 
       {/* 인원 */}
       <div>
-        <label htmlFor="headcount" className="block text-sm font-medium text-gray-700 mb-1">
-          인원 <span className="text-red-500">*</span>
+        <label htmlFor="headcount" className="block text-sm font-medium text-black mb-1">
+          인원 <span className="text-[#DC2626]">*</span>
         </label>
         <select
           id="headcount"
           value={formData.headcount === 0 ? '' : formData.headcount}
           onChange={handleHeadcountChange}
-          className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-            errors.headcount ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white'
+          className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+            errors.headcount ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
           }`}
         >
           <option value="">인원을 선택해주세요</option>
@@ -137,14 +137,14 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
           ))}
         </select>
         {errors.headcount && (
-          <p className="mt-1 text-xs text-red-500">{errors.headcount}</p>
+          <p className="mt-1 text-xs text-[#DC2626]">{errors.headcount}</p>
         )}
       </div>
 
       {/* 일시 */}
       <div>
-        <p className="block text-sm font-medium text-gray-700 mb-1">
-          일시 <span className="text-red-500">*</span>
+        <p className="block text-sm font-medium text-black mb-1">
+          일시 <span className="text-[#DC2626]">*</span>
         </p>
         <TimeSlotPicker
           spaceId={spaceIdForPicker}
@@ -152,14 +152,14 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
           onChange={handleTimeSlotChange}
         />
         {errors.start_datetime && (
-          <p className="mt-1 text-xs text-red-500">{errors.start_datetime}</p>
+          <p className="mt-1 text-xs text-[#DC2626]">{errors.start_datetime}</p>
         )}
       </div>
 
       {/* 사용 목적 */}
       <div>
-        <label htmlFor="purpose" className="block text-sm font-medium text-gray-700 mb-1">
-          사용 목적 <span className="text-red-500">*</span>
+        <label htmlFor="purpose" className="block text-sm font-medium text-black mb-1">
+          사용 목적 <span className="text-[#DC2626]">*</span>
         </label>
         <textarea
           id="purpose"
@@ -167,18 +167,18 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
           onChange={handleTextChange('purpose')}
           placeholder="예: 청년부 정기모임"
           rows={3}
-          className={`w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400 resize-none ${
-            errors.purpose ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white'
+          className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] resize-none ${
+            errors.purpose ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
           }`}
         />
         {errors.purpose && (
-          <p className="mt-1 text-xs text-red-500">{errors.purpose}</p>
+          <p className="mt-1 text-xs text-[#DC2626]">{errors.purpose}</p>
         )}
       </div>
 
       {/* 제출 에러 메시지 */}
       {submitError && (
-        <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">
+        <div className="rounded-xl bg-[#DC2626]/10 border border-[#DC2626]/30 p-3 text-sm text-[#DC2626]">
           {submitError}
         </div>
       )}
@@ -187,7 +187,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
       <button
         type="submit"
         disabled={isSubmitting}
-        className="w-full rounded-md bg-blue-600 px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
+        className="w-full rounded-xl bg-[#008F49] px-4 py-3 text-base font-bold text-white transition-colors hover:bg-[#AAA014] disabled:cursor-not-allowed disabled:bg-[#E5E7EB]"
       >
         {isSubmitting ? '신청 중...' : '장소 사용 신청'}
       </button>

@@ -83,15 +83,15 @@ export function SpaceSelector({ value, onChange }: SpaceSelectorProps): JSX.Elem
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-500 border-t-transparent" />
-        <span className="ml-2 text-sm text-gray-500">장소 목록 불러오는 중...</span>
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-[#008F49] border-t-transparent" />
+        <span className="ml-2 text-sm text-black">장소 목록 불러오는 중...</span>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="rounded-md bg-red-50 p-4 text-sm text-red-600">
+      <div className="rounded-xl bg-[#DC2626]/10 p-4 text-sm text-[#DC2626]">
         {error}
       </div>
     );
@@ -101,17 +101,17 @@ export function SpaceSelector({ value, onChange }: SpaceSelectorProps): JSX.Elem
     <div className="space-y-4">
       {/* 1단계: 건물 선택 */}
       <div>
-        <p className="mb-2 text-sm font-medium text-gray-700">건물 선택</p>
+        <p className="mb-2 text-sm font-medium text-black">건물 선택</p>
         <div className="flex flex-wrap gap-2">
           {buildings.map((building) => (
             <button
               key={building.id}
               type="button"
               onClick={() => handleBuildingSelect(building.id)}
-              className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 selectedBuildingId === building.id
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                  ? 'bg-[#008F49] text-white'
+                  : 'bg-[#E5E7EB] text-black hover:bg-[#D1D5DB]'
               }`}
             >
               {building.name}
@@ -123,17 +123,17 @@ export function SpaceSelector({ value, onChange }: SpaceSelectorProps): JSX.Elem
       {/* 2단계: 층 선택 */}
       {selectedBuildingId !== null && (
         <div>
-          <p className="mb-2 text-sm font-medium text-gray-700">층 선택</p>
+          <p className="mb-2 text-sm font-medium text-black">층 선택</p>
           <div className="flex flex-wrap gap-2">
             {sortedFloors.map((floor) => (
               <button
                 key={floor === null ? 'null' : floor}
                 type="button"
                 onClick={() => handleFloorSelect(floor)}
-                className={`rounded-md px-4 py-2 text-sm font-medium transition-colors ${
+                className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                   selectedFloor === floor
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    ? 'bg-[#008F49] text-white'
+                    : 'bg-[#E5E7EB] text-black hover:bg-[#D1D5DB]'
                 }`}
               >
                 {floorLabel(floor)}
@@ -146,17 +146,17 @@ export function SpaceSelector({ value, onChange }: SpaceSelectorProps): JSX.Elem
       {/* 3단계: 공간 선택 */}
       {selectedFloor !== undefined && (
         <div>
-          <p className="mb-2 text-sm font-medium text-gray-700">공간 선택</p>
+          <p className="mb-2 text-sm font-medium text-black">공간 선택</p>
           <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
             {currentFloorSpaces.map((space) => (
               <button
                 key={space.id}
                 type="button"
                 onClick={() => handleSpaceSelect(space.id)}
-                className={`rounded-md border p-3 text-left transition-colors ${
+                className={`rounded-xl border p-3 text-left transition-colors ${
                   value === space.id
-                    ? 'border-blue-600 bg-blue-50 text-blue-800'
-                    : 'border-gray-200 bg-white text-gray-700 hover:border-blue-300 hover:bg-blue-50'
+                    ? 'border-[#008F49] bg-[#008F49]/5 text-[#008F49]'
+                    : 'border-[#E5E7EB] bg-white text-black hover:border-[#008F49]/40 hover:bg-[#008F49]/5'
                 }`}
               >
                 <span className="block font-medium">{space.name}</span>
