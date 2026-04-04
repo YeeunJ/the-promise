@@ -3,12 +3,19 @@
   "private": true,
   "scripts": {
     "dev": "docker compose up",
-    "dev:frontend": "pnpm --filter frontend dev",
-    "build:frontend": "pnpm --filter frontend build",
-    "lint": "pnpm --filter frontend lint"
+    "dev:infra": "docker compose -f infra/docker-compose.yml up -d db redis",
+    "dev:api": "apps/api/.venv/Scripts/python apps/api/manage.py runserver",
+    "dev:api:win": "powershell -NoProfile -Command \"& .\\apps\\api\\.venv\\Scripts\\python.exe .\\apps\\api\\manage.py runserver\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:local": "pnpm dev:infra && concurrently \"pnpm dev:api\" \"pnpm dev:web\"",
+    "build:frontend": "pnpm --filter web build",
+    "lint": "pnpm --filter web lint"
   },
   "engines": {
     "node": ">=18",
     "pnpm": ">=8"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.1"
   }
 }
