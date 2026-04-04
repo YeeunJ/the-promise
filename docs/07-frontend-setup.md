@@ -55,7 +55,9 @@ cd apps/web
 pnpm dev
 ```
 
-브라우저에서 `http://localhost:5173` 에서 확인합니다.
+브라우저 접속 주소:
+- 사용자 앱: `http://localhost:5173`
+- 관리자 앱: `http://localhost:5173/admin.html`
 
 > 백엔드(`http://localhost:8000`)가 실행 중이어야 API 연동이 정상 동작합니다. 백엔드 실행 방법은 `docs/06-backend-setup.md`를 참고하세요.
 
@@ -68,15 +70,20 @@ cd apps/web
 pnpm test
 ```
 
-vitest v4.1.2로 실행됩니다. 현재 3개 파일, 56개 테스트가 정의되어 있습니다.
+vitest v4.1.2로 실행됩니다. 현재 8개 파일, 116개 테스트가 정의되어 있습니다.
 
 ```
 PASS  src/__tests__/formatDatetime.test.ts
 PASS  src/__tests__/formatPhone.test.ts
 PASS  src/__tests__/reservationFormHelpers.test.ts
+PASS  src/__tests__/extractDateStr.test.ts
+PASS  src/__tests__/adminTypes.test.ts
+PASS  src/__tests__/CalendarGrid.test.tsx
+PASS  src/__tests__/AdminLoginForm.test.tsx
+PASS  src/__tests__/ReservationPanel.test.tsx
 
-Test Files  3 passed
-Tests      56 passed
+Test Files  8 passed
+Tests      116 passed
 ```
 
 한 번 실행 후 종료하려면:
@@ -102,20 +109,30 @@ pnpm build
 
 ```
 apps/web/src/
-├── types/index.ts            ← 공용 TypeScript 타입 (Reservation, Space 등)
-├── pages/ReservationPage.tsx ← 예약 신청/조회 탭 통합 페이지
+├── types/index.ts              ← 공용 TypeScript 타입 (Reservation, Space, Admin 타입 등)
+├── pages/
+│   ├── ReservationPage.tsx     ← 예약 신청/조회 탭 통합 페이지
+│   └── AdminPage.tsx           ← 관리자 달력/예약 목록 페이지 (로그인 게이트 포함)
 ├── components/
-│   ├── ReservationForm.tsx   ← 예약 신청 폼 (전체 조합)
-│   ├── ApplicantFields.tsx   ← 신청자 정보 필드 그룹
-│   ├── SpaceSelector.tsx     ← 건물→층→공간 3단계 선택
-│   ├── TimeSlotPicker.tsx    ← 30분 단위 시간 선택
-│   ├── ReservationSummary.tsx← 신청 완료 요약 카드
-│   ├── LookupForm.tsx        ← 예약 조회 폼
-│   └── ReservationTable.tsx  ← 예약 목록 테이블
-└── utils/
-    ├── formatDatetime.ts     ← 날짜/시간 포맷 함수
-    ├── formatPhone.ts        ← 전화번호 포맷 함수
-    └── reservationFormHelpers.ts ← 폼 유효성 검사, 초기값
+│   ├── ReservationForm.tsx     ← 예약 신청 폼 (전체 조합)
+│   ├── ApplicantFields.tsx     ← 신청자 정보 필드 그룹 (sm 이상 2컬럼 그리드)
+│   ├── SpaceSelector.tsx       ← 건물→층→공간 3단계 선택
+│   ├── TimeSlotPicker.tsx      ← 30분 단위 시간 선택
+│   ├── ReservationSummary.tsx  ← 신청 완료 요약 카드
+│   ├── LookupForm.tsx          ← 예약 조회 폼
+│   ├── ReservationTable.tsx    ← 예약 목록 테이블
+│   ├── AdminLoginForm.tsx      ← 관리자 로그인 폼
+│   └── admin/
+│       ├── CalendarGrid.tsx    ← 7×6 달력 그리드 (직접 구현)
+│       └── ReservationPanel.tsx← 선택 날짜 예약 목록 + 취소
+├── utils/
+│   ├── formatDatetime.ts       ← 날짜/시간 포맷 함수 + extractDateStr
+│   ├── formatPhone.ts          ← 전화번호 포맷 함수
+│   └── reservationFormHelpers.ts ← 폼 유효성 검사, 초기값
+├── App.tsx                     ← 사용자 앱 라우터
+├── AdminApp.tsx                ← 관리자 앱 라우터
+├── main.tsx                    ← 사용자 앱 진입점
+└── admin-main.tsx              ← 관리자 앱 진입점
 ```
 
 ---

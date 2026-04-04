@@ -79,33 +79,40 @@ apps/api/
 
 ```
 apps/web/
-├── index.html                            ← Vite 진입점 (public/ 아닌 루트에 위치)
+├── index.html                            ← 사용자 앱 Vite 진입점 (public/ 아닌 루트에 위치)
+├── admin.html                            ← 관리자 앱 Vite 진입점 (멀티 엔트리)
 ├── tailwind.config.js                    ← Tailwind CSS 설정 (content 경로 지정)
 ├── postcss.config.js                     ← PostCSS 설정 (tailwindcss, autoprefixer)
-├── vite.config.ts                        ← Vite 빌드/개발 서버 설정
+├── vite.config.ts                        ← Vite 빌드/개발 서버 설정 (멀티 엔트리 포함)
 ├── public/
 │   └── favicon.ico                       ← 정적 자산 (빌드 시 그대로 복사됨)
 ├── src/
 │   ├── index.css                         ← Tailwind 지시어(@tailwind) + 전역 스타일
 │   ├── pages/
 │   │   ├── ReservationPage.tsx           ← 예약 신청 + 조회 탭 통합 페이지
-│   │   └── AdminPage.tsx                 ← 관리자 달력 + 예약 목록 페이지
+│   │   └── AdminPage.tsx                 ← 관리자 달력 + 예약 목록 페이지 (로그인 게이트 포함)
 │   ├── components/
 │   │   ├── ReservationForm.tsx           ← 예약 신청 입력 폼 (전체 폼 조합)
-│   │   ├── ApplicantFields.tsx           ← 신청자 정보 필드 그룹 (이름/연락처/단체명/책임자)
+│   │   ├── ApplicantFields.tsx           ← 신청자 정보 필드 그룹 (이름/연락처/단체명/책임자, 2컬럼 그리드)
 │   │   ├── SpaceSelector.tsx             ← 3단계 장소 선택 컴포넌트 (건물→층→공간)
 │   │   ├── TimeSlotPicker.tsx            ← 30분 단위 시간 선택 UI
 │   │   ├── ReservationSummary.tsx        ← 예약 완료 후 내용 요약 카드
 │   │   ├── LookupForm.tsx                ← 이름+연락처로 예약 조회하는 폼
-│   │   └── ReservationTable.tsx          ← 예약 목록 테이블 (모바일: 카드 리스트)
+│   │   ├── ReservationTable.tsx          ← 예약 목록 테이블 (모바일: 카드 리스트)
+│   │   ├── AdminLoginForm.tsx            ← 관리자 로그인 폼
+│   │   └── admin/
+│   │       ├── CalendarGrid.tsx          ← 7×6 달력 그리드 (직접 구현, Event Chip, 모바일 dot)
+│   │       └── ReservationPanel.tsx      ← 선택 날짜 예약 목록 + 취소 기능
 │   ├── types/
 │   │   └── index.ts                      ← 프론트엔드 공용 TypeScript 타입 정의
 │   ├── utils/
-│   │   ├── formatDatetime.ts             ← ISO 8601 날짜를 사람이 읽기 쉬운 형식으로 변환
+│   │   ├── formatDatetime.ts             ← ISO 8601 날짜를 사람이 읽기 쉬운 형식으로 변환 (extractDateStr 포함)
 │   │   ├── formatPhone.ts               ← 전화번호 형식 변환 (010-0000-0000)
 │   │   └── reservationFormHelpers.ts     ← 폼 유효성 검사, 초기값 상수
-│   ├── App.tsx                           ← 라우터 설정 (페이지 연결)
-│   └── main.tsx                          ← React 앱 진입점 (index.html과 연결)
+│   ├── App.tsx                           ← 사용자 앱 라우터 설정
+│   ├── main.tsx                          ← 사용자 앱 React 진입점 (index.html과 연결)
+│   ├── AdminApp.tsx                      ← 관리자 앱 라우터 설정
+│   └── admin-main.tsx                    ← 관리자 앱 React 진입점 (admin.html과 연결)
 ├── tsconfig.json                         ← TypeScript 컴파일 설정 (path alias @/ 포함)
 └── package.json                          ← frontend 의존성 및 스크립트
 ```
@@ -114,42 +121,64 @@ apps/web/
 
 | 파일 | 역할 |
 |------|------|
-| `index.html` | Vite가 빌드 시 기준으로 삼는 HTML. `<div id="root">`와 `main.tsx` 스크립트 태그 포함. `<html lang="ko">` |
-| `src/main.tsx` | `ReactDOM.createRoot()`로 React 앱을 `#root`에 마운트하는 진입점. `BrowserRouter` 래핑 포함 |
-| `src/App.tsx` | URL 경로별로 어떤 페이지 컴포넌트를 렌더링할지 라우터로 정의. 현재 `/` → `ReservationPage` |
-| `src/index.css` | `@tailwind base/components/utilities` 지시어와 전역 body 폰트(Pretendard) 정의 |
+| `index.html` | 사용자 앱 Vite 빌드 진입점. `<div id="root">`와 `main.tsx` 스크립트 태그 포함. `<html lang="ko">` |
+| `admin.html` | 관리자 앱 Vite 빌드 진입점. `<div id="admin-root">`와 `admin-main.tsx` 스크립트 태그 포함 |
+| `vite.config.ts` | Vite 설정. `build.rollupOptions.input`에 `{ main: index.html, admin: admin.html }` 멀티 엔트리 설정 포함 |
+| `src/main.tsx` | `ReactDOM.createRoot()`로 사용자 앱을 `#root`에 마운트하는 진입점. `BrowserRouter` + `App` 렌더링 |
+| `src/admin-main.tsx` | `ReactDOM.createRoot()`로 관리자 앱을 `#admin-root`에 마운트하는 진입점. `BrowserRouter` + `AdminApp` 렌더링 |
+| `src/App.tsx` | 사용자 앱 라우터. `/` → `ReservationPage` |
+| `src/AdminApp.tsx` | 관리자 앱 라우터. `/admin.html` → `AdminPage` |
+| `src/index.css` | `@tailwind base/components/utilities` 지시어와 전역 body 폰트(Pretendard) 정의. 사용자 앱·관리자 앱 공유 |
 | `src/pages/` | URL 하나에 대응하는 화면 전체. 여러 컴포넌트를 조합해 한 페이지를 구성 |
 | `src/components/ReservationForm.tsx` | 예약 신청 전체 폼. `ApplicantFields`, `SpaceSelector`, `TimeSlotPicker`를 조합하고 API 제출을 담당 |
-| `src/components/ApplicantFields.tsx` | 신청자 이름, 연락처, 단체명, 책임자 연락처 필드 그룹. `ReservationForm`에서 분리된 컴포넌트 |
+| `src/components/ApplicantFields.tsx` | 신청자 이름, 연락처, 단체명, 책임자 연락처 필드 그룹. sm 이상 화면에서 2컬럼 그리드 레이아웃 |
 | `src/components/SpaceSelector.tsx` | 건물→층→공간 3단계 progressive disclosure 선택 UI. 내부에서 `GET /api/v1/spaces/` 호출 |
 | `src/components/TimeSlotPicker.tsx` | 날짜 선택 후 30분 단위 슬롯 버튼 그리드 표시. 시작→종료 순서로 2번 클릭해 범위 선택 |
 | `src/components/ReservationSummary.tsx` | 신청 완료 후 예약 내용 요약 카드. `status`에 따라 확정/거절 배너 표시 |
 | `src/components/LookupForm.tsx` | 이름+연락처 입력 폼. 제출 시 `GET /api/v1/reservations/?name=&phone=` 호출 |
 | `src/components/ReservationTable.tsx` | 예약 목록을 표 형태로 표시 (데스크탑). 모바일에서는 카드 리스트로 전환 |
-| `src/types/index.ts` | `Reservation`, `ReservationFormData`, `Building`, `Space`, `BuildingWithSpaces` 등 API 응답·요청 타입 정의 |
-| `src/utils/formatDatetime.ts` | ISO 8601 날짜 문자열을 화면에 표시할 형식으로 변환하는 순수 함수 4개 |
+| `src/components/AdminLoginForm.tsx` | 관리자 로그인 폼. `POST /api/v1/admin/login/` 호출, 성공 시 `admin_token`을 localStorage에 저장 |
+| `src/components/admin/CalendarGrid.tsx` | 7×6(42칸) 달력 그리드. 외부 라이브러리 없이 직접 구현. Event Chip(최대 3개), +N more 배지, 모바일 dot 인디케이터 포함 |
+| `src/components/admin/ReservationPanel.tsx` | 달력에서 선택한 날짜의 예약 목록 표시. `confirmed`/`pending` 상태 예약의 취소 버튼 (`PATCH /api/v1/admin/reservations/{id}/`) 포함 |
+| `src/types/index.ts` | `Reservation`, `ReservationFormData`, `Building`, `Space`, `BuildingWithSpaces`, `AdminLoginRequest`, `AdminLoginResponse`, `ADMIN_TOKEN_KEY`, `UpdateReservationStatusPayload` 타입/상수 정의 |
+| `src/utils/formatDatetime.ts` | ISO 8601 날짜 문자열을 화면에 표시할 형식으로 변환하는 순수 함수. `formatDate`, `formatTime`, `formatDatetimeRange`, `generateTimeSlots`, `extractDateStr` 5개 함수 포함 |
 | `src/utils/formatPhone.ts` | 전화번호 문자열을 `010-0000-0000` 형식으로 변환하는 순수 함수 2개 |
 | `src/utils/reservationFormHelpers.ts` | `PHONE_REGEX`, `INITIAL_FORM_DATA`, `INITIAL_TIME_SLOT` 상수와 `validateReservationForm` 함수 |
 
 > **`index.html`이 `public/`이 아닌 루트에 있는 이유**
 > Vite는 `public/`을 정적 자산 폴더로 사용하고, `index.html`은 빌드 진입점으로 프로젝트 루트에 둡니다. `public/index.html`로 두면 Vite가 인식하지 못합니다.
 
+> **관리자 앱(`admin.html`)이 별도 파일로 분리된 이유**
+> 관리자 기능은 일반 사용자에게 노출되지 않아야 하며, 번들 크기를 분리하는 것이 바람직합니다. Vite 멀티 엔트리 설정으로 `dist/index.html`(사용자)과 `dist/admin.html`(관리자)을 각각 빌드합니다. 타입·유틸·Tailwind 설정은 두 앱이 공유합니다.
+
 ### 컴포넌트 구조도
 
 ```
-ReservationPage (페이지)
-├── 탭 UI ("예약 신청" / "내 예약 조회")
+[사용자 앱] App.tsx → /
 │
-├── [예약 신청 탭]
-│   ├── ReservationForm
-│   │   ├── ApplicantFields (이름/연락처/단체명/책임자)
-│   │   ├── SpaceSelector (건물→층→공간, 내부에서 GET /api/v1/spaces/ 호출)
-│   │   └── TimeSlotPicker (날짜 + 30분 단위 슬롯)
-│   └── ReservationSummary (신청 완료 후 표시, status 배너 포함)
+└── ReservationPage (페이지)
+    ├── 탭 UI ("예약 신청" / "내 예약 조회")
+    │
+    ├── [예약 신청 탭]
+    │   ├── ReservationForm
+    │   │   ├── ApplicantFields (이름/연락처/단체명/책임자, sm에서 2컬럼 그리드)
+    │   │   ├── SpaceSelector (건물→층→공간, 내부에서 GET /api/v1/spaces/ 호출)
+    │   │   └── TimeSlotPicker (날짜 + 30분 단위 슬롯)
+    │   └── ReservationSummary (신청 완료 후 표시, status 배너 포함)
+    │
+    └── [내 예약 조회 탭]
+        ├── LookupForm (이름+연락처 입력, GET /api/v1/reservations/ 호출)
+        └── ReservationTable (status 배지 포함, 모바일 카드 리스트)
+
+[관리자 앱] AdminApp.tsx → /admin.html
 │
-└── [내 예약 조회 탭]
-    ├── LookupForm (이름+연락처 입력, GET /api/v1/reservations/ 호출)
-    └── ReservationTable (status 배지 포함, 모바일 카드 리스트)
+└── AdminPage (페이지, 로그인 여부에 따라 분기)
+    │
+    ├── [미로그인] AdminLoginForm (POST /api/v1/admin/login/, localStorage 토큰 저장)
+    │
+    └── [로그인 완료] 헤더 + 달력 레이아웃
+        ├── CalendarGrid (GET /api/v1/admin/reservations/, 날짜 선택 시 onDateSelect 콜백)
+        └── ReservationPanel (선택 날짜 예약 목록, PATCH /api/v1/admin/reservations/{id}/ 취소)
 ```
 
 ---
@@ -213,20 +242,25 @@ infra/
     spaces/                         ← GET: 건물+공간 목록 조회 (BuildingWithSpaces[] 반환)
     reservations/                   ← POST: 예약 신청 / GET: 이름+연락처로 예약 조회
     admin/
-        login/                      ← 관리자 로그인
-        reservations/               ← 전체 예약 조회
-        reservations/<id>/cancel/   ← 예약 취소
+        login/                      ← POST: 관리자 로그인 (토큰 발급)
+        reservations/               ← GET: 전체 예약 조회 (인증 필요)
+        reservations/<id>/          ← PATCH: 예약 상태 변경 (취소 등, 인증 필요)
 ```
 
 ### 엔드포인트 상세
 
-| 메서드 | 경로 | 설명 |
-|--------|------|------|
-| GET | `/api/v1/spaces/` | 건물+공간 목록 반환. 응답 타입: `BuildingWithSpaces[]`. 층 그룹핑은 클라이언트(SpaceSelector)에서 처리 |
-| POST | `/api/v1/reservations/` | 예약 신청. 충돌 없으면 `status: "confirmed"`, 시간 충돌 시 `status: "rejected"` 자동 설정. 응답: 201 |
-| GET | `/api/v1/reservations/?name=&phone=` | 이름+연락처로 본인 예약 조회. `name`과 `phone` 쿼리 파라미터 둘 다 필수 |
+| 메서드 | 경로 | 인증 | 설명 |
+|--------|------|------|------|
+| GET | `/api/v1/spaces/` | 불필요 | 건물+공간 목록 반환. 응답 타입: `BuildingWithSpaces[]`. 층 그룹핑은 클라이언트(SpaceSelector)에서 처리 |
+| POST | `/api/v1/reservations/` | 불필요 | 예약 신청. 충돌 없으면 `status: "confirmed"`, 시간 충돌 시 `status: "rejected"` 자동 설정. 응답: 201 |
+| GET | `/api/v1/reservations/?name=&phone=` | 불필요 | 이름+연락처로 본인 예약 조회. `name`과 `phone` 쿼리 파라미터 둘 다 필수 |
+| POST | `/api/v1/admin/login/` | 불필요 | 관리자 로그인. 요청: `{ username, password }`, 응답: `{ token }`. 토큰은 클라이언트가 `localStorage`에 저장 |
+| GET | `/api/v1/admin/reservations/` | Token | 전체 예약 목록 조회. 헤더: `Authorization: Token <token>`. 응답: `Reservation[]` |
+| PATCH | `/api/v1/admin/reservations/{id}/` | Token | 예약 상태 변경. 헤더: `Authorization: Token <token>`. 요청 body: `{ status: 'cancelled' \| 'confirmed' \| 'rejected', admin_note?: string }` |
 
 > **시간 슬롯 가용 여부 API (`GET /api/v1/spaces/{id}/availability/`)는 미구현 상태입니다.** Phase 2 이후 구현 예정. 현재 `TimeSlotPicker`는 모든 슬롯을 활성화 표시하며, 중복 신청이 들어오면 백엔드가 `rejected`로 자동 처리합니다.
+
+> **Admin 인증 방식**: Django REST Framework `authtoken` 패턴의 `Token <token>` 헤더를 사용합니다. 토큰은 `AdminLoginForm`이 로그인 성공 시 `localStorage`의 `admin_token` 키에 저장합니다. `AdminPage`와 `ReservationPanel`이 API 호출마다 이 토큰을 헤더에 포함합니다.
 
 ---
 
