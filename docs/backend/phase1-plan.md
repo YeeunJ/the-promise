@@ -74,6 +74,7 @@
 | `/api/v1/admin/login/` | POST | 관리자 로그인 (token 발급) |
 | `/api/v1/admin/reservations/` | GET | 전체 예약 목록 조회 |
 | `/api/v1/admin/reservations/<id>/cancel/` | POST | 예약 취소 |
+| `/api/v1/spaces/<id>/reservations/?date=YYYY-MM-DD` | GET | 공간별 날짜 예약 현황 조회 |
 
 ### 5. 관리자 화면 (`reservations/admin.py`)
 
@@ -92,7 +93,27 @@
 | `docker-compose.yml` | db(PostgreSQL), redis, api(Django), worker(Celery), web(React) 서비스 정의 |
 | `init.sql` | 타임존 설정 (`SET timezone = 'Asia/Seoul'`) |
 
-### 8. 테스트 (`reservations/tests.py`)
+### 8. 예외 처리 추가 (추가 구현)
+
+| 위치 | 예외 상황 | 처리 |
+|------|----------|------|
+| `AdminReservationListView` | `date` 파라미터 형식 오류 (예: `abc`) | 400 반환 |
+| `SpaceReservationListView` | `date` 파라미터 형식 오류 | 400 반환 |
+| `ReservationCreateSerializer` | 비활성 공간(`is_active=False`)에 예약 신청 | 400 반환 |
+| `ReservationCreateSerializer` | 과거 시간으로 예약 신청 | 400 반환 |
+| `AdminReservationCancelView` | `rejected` 상태 예약 취소 시도 | 400 반환 (`cannot_cancel_rejected`) |
+
+### 9. 공간별 예약 현황 조회 API (추가 구현)
+
+| 엔드포인트 | 메서드 | 설명 |
+|-----------|--------|------|
+| `/api/v1/spaces/<id>/reservations/?date=YYYY-MM-DD` | GET | 특정 날짜에 해당 공간의 confirmed 예약 목록 반환 |
+
+- 프론트엔드에서 날짜별 공간 예약 현황을 보여주기 위한 API
+- `date` 파라미터 필수, 없으면 400 반환
+- `confirmed` 상태인 예약만 반환 (rejected/cancelled 제외)
+
+### 9. 테스트 (`reservations/tests.py`)
 
 - 테스트 범위: 모델 메서드 + 전체 API 엔드포인트 정상/에러 케이스
 - 도구: `django.test.TestCase` + `rest_framework.test.APIClient`
