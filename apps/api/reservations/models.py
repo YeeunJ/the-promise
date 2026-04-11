@@ -1,4 +1,19 @@
 from django.db import models
+from django.utils import timezone
+
+
+class Team(models.Model):
+    name         = models.CharField(max_length=100, unique=True)
+    leader_phone = models.CharField(max_length=20)
+    is_active    = models.BooleanField(default=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "teams"
+
+    def __str__(self):
+        return self.name
 
 
 class Building(models.Model):
@@ -55,6 +70,8 @@ class Reservation(models.Model):
                           default=Status.CONFIRMED,
                       )
     admin_note      = models.TextField(blank=True, null=True)
+    is_deleted      = models.BooleanField(default=False)
+    deleted_at      = models.DateTimeField(null=True, blank=True)
     created_at      = models.DateTimeField(auto_now_add=True)
     updated_at      = models.DateTimeField(auto_now=True)
 
@@ -77,6 +94,7 @@ class Reservation(models.Model):
         qs = Reservation.objects.filter(
             space=self.space,
             status=Reservation.Status.CONFIRMED,
+            is_deleted=False,
             start_datetime__lt=self.end_datetime,
             end_datetime__gt=self.start_datetime,
         )
