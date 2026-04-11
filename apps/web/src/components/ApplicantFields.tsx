@@ -23,7 +23,7 @@ export function ApplicantFields({ formData, errors, onTextChange, onPhoneChange 
             value={formData.applicant_name}
             onChange={onTextChange('applicant_name')}
             placeholder="홍길동"
-            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
               errors.applicant_name ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
             }`}
           />
@@ -44,7 +44,7 @@ export function ApplicantFields({ formData, errors, onTextChange, onPhoneChange 
             onChange={onPhoneChange('applicant_phone')}
             placeholder="010-0000-0000"
             inputMode="numeric"
-            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
               errors.applicant_phone ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
             }`}
           />
@@ -67,7 +67,7 @@ export function ApplicantFields({ formData, errors, onTextChange, onPhoneChange 
             value={formData.applicant_team}
             onChange={onTextChange('applicant_team')}
             placeholder="청년부"
-            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
               errors.applicant_team ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
             }`}
           />
@@ -88,7 +88,7 @@ export function ApplicantFields({ formData, errors, onTextChange, onPhoneChange 
             onChange={onPhoneChange('leader_phone')}
             placeholder="010-0000-0000"
             inputMode="numeric"
-            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+            className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
               errors.leader_phone ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
             }`}
           />

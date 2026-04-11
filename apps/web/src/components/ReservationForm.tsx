@@ -1,85 +1,96 @@
 import { useState } from 'react';
 import axios, { isAxiosError } from 'axios';
 import type { Reservation, ReservationFormData, TimeSlotValue, ApiError } from '../types';
-import { normalizePhone } from '../utils/formatPhone';
-import { validateReservationForm, INITIAL_FORM_DATA, INITIAL_TIME_SLOT } from '../utils/reservationFormHelpers';
-import { SpaceSelector } from './SpaceSelector';
-import TimeSlotPicker from './TimeSlotPicker';
-import { ApplicantFields } from './ApplicantFields';
-import { HEADCOUNT_OPTIONS } from '../../../../packages/shared/constants/reservation';
+import { INITIAL_TIME_SLOT } from '../utils/reservationFormHelpers';
+import { buildCompletedSteps } from '../utils/buildCompletedSteps';
+import type { CompletedStep } from '../utils/buildCompletedSteps';
+import { formatTime } from '../utils/formatDatetime';
+import ApplicantPopup from './reservation/ApplicantPopup';
+import type { ApplicantData } from './reservation/ApplicantPopup';
+import SpacePopup from './reservation/SpacePopup';
+import type { SpaceSelection } from './reservation/SpacePopup';
+import HeadcountPopup from './reservation/HeadcountPopup';
+import DateTimePopup from './reservation/DateTimePopup';
+import PurposePopup from './reservation/PurposePopup';
+import type { ActivePopup as ActivePopupStep } from '../types';
+
+type ActivePopup = ActivePopupStep | null;
+const POPUP_SEQUENCE: Exclude<ActivePopup, null>[] = ['applicant', 'space', 'headcount', 'datetime', 'purpose'];
+
+const STEP_LABELS = [
+  '신청자 정보 입력',
+  '장소 선택',
+  '사용 인원 입력',
+  '날짜 및 시간 선택',
+  '사용 목적 입력',
+];
 
 interface ReservationFormProps {
   onSubmitSuccess: (reservation: Reservation) => void;
 }
 
 function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element {
-  const [formData, setFormData] = useState<ReservationFormData>(INITIAL_FORM_DATA);
+  const [applicant, setApplicant] = useState<ApplicantData | null>(null);
+  const [spaceSelection, setSpaceSelection] = useState<SpaceSelection | null>(null);
+  const [headcount, setHeadcount] = useState<number>(0);
   const [timeSlot, setTimeSlot] = useState<TimeSlotValue>(INITIAL_TIME_SLOT);
+  const [purpose, setPurpose] = useState<string>('');
+  const [activePopup, setActivePopup] = useState<ActivePopup>(null);
+  const [isReviewing, setIsReviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<Partial<Record<keyof ReservationFormData, string>>>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
 
-  function handleTextChange(field: 'purpose') {
-    return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    };
+  function goNext() {
+    if (activePopup === null) return;
+    const idx = POPUP_SEQUENCE.indexOf(activePopup);
+    const next = idx + 1;
+    setActivePopup(next < POPUP_SEQUENCE.length ? POPUP_SEQUENCE[next] : null);
   }
 
-  function handleApplicantTextChange(field: 'applicant_name' | 'applicant_team') {
-    return (e: React.ChangeEvent<HTMLInputElement>) => {
-      setFormData((prev) => ({ ...prev, [field]: e.target.value }));
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    };
+  function goBack() {
+    if (activePopup === null) return;
+    const idx = POPUP_SEQUENCE.indexOf(activePopup);
+    setActivePopup(idx > 0 ? POPUP_SEQUENCE[idx - 1] : null);
   }
 
-  function handlePhoneChange(field: 'applicant_phone' | 'leader_phone') {
-    return (e: React.ChangeEvent<HTMLInputElement>) => {
-      const formatted = normalizePhone(e.target.value);
-      setFormData((prev) => ({ ...prev, [field]: formatted }));
-      setErrors((prev) => ({ ...prev, [field]: undefined }));
-    };
-  }
-
-  function handleSpaceChange(spaceId: number) {
-    setFormData((prev) => ({ ...prev, space: spaceId }));
-    setErrors((prev) => ({ ...prev, space: undefined }));
-  }
-
-  function handleHeadcountChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    setFormData((prev) => ({ ...prev, headcount: Number(e.target.value) }));
-    setErrors((prev) => ({ ...prev, headcount: undefined }));
-  }
-
-  function handleTimeSlotChange(value: TimeSlotValue) {
-    setTimeSlot(value);
-    setFormData((prev) => ({
-      ...prev,
-      start_datetime: value.startTime,
-      end_datetime: value.endTime,
-    }));
-    setErrors((prev) => ({
-      ...prev,
-      start_datetime: undefined,
-      end_datetime: undefined,
-    }));
-  }
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  function startFlow() {
     setSubmitError(null);
+    setActivePopup('applicant');
+  }
 
-    const validationErrors = validateReservationForm(formData);
-    if (Object.keys(validationErrors).length > 0) {
-      setErrors(validationErrors);
-      return;
-    }
+  function handleReset() {
+    setApplicant(null);
+    setSpaceSelection(null);
+    setHeadcount(0);
+    setTimeSlot(INITIAL_TIME_SLOT);
+    setPurpose('');
+    setSubmitError(null);
+    setIsReviewing(false);
+    setActivePopup(null);
+  }
+
+  async function handleSubmit(purposeVal: string) {
+    if (!applicant || !spaceSelection || headcount === 0 || !timeSlot.startTime || !timeSlot.endTime || !purposeVal.trim()) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
+
+    const formData: ReservationFormData = {
+      space: spaceSelection.id,
+      applicant_name: applicant.name,
+      applicant_phone: applicant.phone,
+      applicant_team: `${applicant.departmentName} > ${applicant.teamName}`,
+      leader_phone: applicant.pastorDisplay || '직접 문의',
+      headcount,
+      purpose: purposeVal.trim(),
+      start_datetime: timeSlot.startTime,
+      end_datetime: timeSlot.endTime,
+    };
+
     try {
       const response = await axios.post<Reservation>(
         `${import.meta.env.VITE_API_BASE_URL}/api/v1/reservations/`,
-        formData
+        formData,
       );
       onSubmitSuccess(response.data);
     } catch (err) {
@@ -94,104 +105,201 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
     }
   }
 
-  const spaceIdForPicker = formData.space === 0 ? null : formData.space;
+  const completedSteps: CompletedStep[] = buildCompletedSteps({
+    applicant,
+    space: spaceSelection,
+    headcount,
+    timeSlot,
+    purpose,
+  });
 
   return (
-    <form onSubmit={handleSubmit} noValidate className="space-y-6">
-      <ApplicantFields
-        formData={formData}
-        errors={errors}
-        onTextChange={handleApplicantTextChange}
-        onPhoneChange={handlePhoneChange}
+    <>
+      {/* 두 컬럼 카드 */}
+      <div className="w-full max-w-[860px] flex rounded-3xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.12)]">
+
+        {/* 좌측: 초록 안내 패널 */}
+        <div className="w-[300px] flex-none bg-brand-primary flex flex-col items-center justify-center px-7 py-12 text-center">
+          <div className="w-14 h-14 bg-white/20 rounded-2xl flex items-center justify-center text-2xl mb-3.5">
+            🏛️
+          </div>
+          <p className="text-white font-extrabold text-xl tracking-tight mb-1">장소 사용 신청</p>
+          <p className="text-white/70 text-xs mb-7">5단계로 간편하게 신청하세요</p>
+
+          <div className="flex flex-col self-stretch">
+            {STEP_LABELS.map((label, i) => (
+              <div
+                key={label}
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-white/[0.12] mb-1.5"
+              >
+                <div className="w-6 h-6 rounded-full bg-white/[0.28] flex items-center justify-center text-[11px] font-bold text-white flex-shrink-0">
+                  {i + 1}
+                </div>
+                <span className="text-[13px] font-semibold text-white/[0.92] text-left">{label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 우측: CTA 또는 검토 패널 */}
+        <div className="flex-1 bg-brand-cream flex flex-col items-center justify-center px-[52px] py-16">
+          {!isReviewing ? (
+            <div className="w-full flex flex-col items-center gap-4">
+              <p className="text-sm font-semibold text-[#9a7f5a] tracking-wide">준비가 되셨나요?</p>
+              <button
+                type="button"
+                onClick={startFlow}
+                className="w-full rounded-[18px] bg-brand-accent px-6 py-8 text-[22px] font-black text-white shadow-[0_6px_28px_rgba(188,138,95,0.50)] transition-all hover:bg-[#a8784f] hover:-translate-y-0.5 hover:shadow-[0_10px_36px_rgba(188,138,95,0.65)] active:bg-[#946840] active:translate-y-0"
+              >
+                장소 사용 신청하기
+              </button>
+            </div>
+          ) : (
+            applicant && spaceSelection && (
+              <div className="w-full">
+                <ReviewPanel
+                  applicant={applicant}
+                  spaceSelection={spaceSelection}
+                  headcount={headcount}
+                  timeSlot={timeSlot}
+                  purpose={purpose}
+                  submitError={submitError}
+                  isSubmitting={isSubmitting}
+                  onEdit={() => { setIsReviewing(false); setActivePopup('applicant'); }}
+                  onSubmit={() => void handleSubmit(purpose)}
+                />
+              </div>
+            )
+          )}
+        </div>
+      </div>
+
+      {/* 팝업들 (fixed overlay) */}
+      <ApplicantPopup
+        isOpen={activePopup === 'applicant'}
+        onClose={() => setActivePopup(null)}
+        onReset={handleReset}
+        value={applicant}
+        onConfirm={(data) => { setApplicant(data); goNext(); }}
+        completedSteps={completedSteps}
       />
+      <SpacePopup
+        isOpen={activePopup === 'space'}
+        onClose={() => setActivePopup(null)}
+        onBack={goBack}
+        onReset={handleReset}
+        value={spaceSelection?.id ?? null}
+        previousSelection={spaceSelection}
+        onSelected={(sel) => { setSpaceSelection(sel); goNext(); }}
+        completedSteps={completedSteps}
+      />
+      <HeadcountPopup
+        isOpen={activePopup === 'headcount'}
+        onClose={() => setActivePopup(null)}
+        onBack={goBack}
+        onReset={handleReset}
+        value={headcount}
+        onConfirm={(val) => { setHeadcount(val); goNext(); }}
+        completedSteps={completedSteps}
+      />
+      <DateTimePopup
+        isOpen={activePopup === 'datetime'}
+        onClose={() => setActivePopup(null)}
+        onBack={goBack}
+        onReset={handleReset}
+        spaceId={spaceSelection?.id ?? null}
+        value={timeSlot}
+        onConfirm={(val) => { setTimeSlot(val); goNext(); }}
+        completedSteps={completedSteps}
+      />
+      <PurposePopup
+        isOpen={activePopup === 'purpose'}
+        onClose={() => setActivePopup(null)}
+        onBack={goBack}
+        onReset={handleReset}
+        value={purpose}
+        onConfirm={(val) => { setPurpose(val); setActivePopup(null); setIsReviewing(true); }}
+        completedSteps={completedSteps}
+      />
+    </>
+  );
+}
 
-      {/* 장소 */}
-      <div>
-        <p className="block text-sm font-medium text-black mb-1">
-          장소 <span className="text-[#DC2626]">*</span>
-        </p>
-        <SpaceSelector value={spaceIdForPicker} onChange={handleSpaceChange} />
-        {errors.space && (
-          <p className="mt-1 text-xs text-[#DC2626]">{errors.space}</p>
-        )}
+interface ReviewPanelProps {
+  applicant: ApplicantData;
+  spaceSelection: SpaceSelection;
+  headcount: number;
+  timeSlot: TimeSlotValue;
+  purpose: string;
+  submitError: string | null;
+  isSubmitting: boolean;
+  onEdit: () => void;
+  onSubmit: () => void;
+}
+
+function ReviewPanel({
+  applicant,
+  spaceSelection,
+  headcount,
+  timeSlot,
+  purpose,
+  submitError,
+  isSubmitting,
+  onEdit,
+  onSubmit,
+}: ReviewPanelProps): JSX.Element {
+  const spaceLabel = `${spaceSelection.buildingName}${spaceSelection.floor !== null ? ` ${spaceSelection.floor}층` : ''} ${spaceSelection.spaceName}`;
+  const datetimeLabel = `${timeSlot.date} ${formatTime(timeSlot.startTime)} ~ ${formatTime(timeSlot.endTime)}`;
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white shadow-md overflow-hidden">
+      <div className="bg-brand-primary px-5 py-4">
+        <p className="text-white font-bold text-base">신청 내용 확인</p>
+        <p className="text-white/70 text-xs mt-0.5">아래 내용을 확인하고 신청해주세요</p>
       </div>
 
-      {/* 인원 */}
-      <div>
-        <label htmlFor="headcount" className="block text-sm font-medium text-black mb-1">
-          인원 <span className="text-[#DC2626]">*</span>
-        </label>
-        <select
-          id="headcount"
-          value={formData.headcount === 0 ? '' : formData.headcount}
-          onChange={handleHeadcountChange}
-          className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
-            errors.headcount ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
-          }`}
-        >
-          <option value="">인원을 선택해주세요</option>
-          {HEADCOUNT_OPTIONS.map((count: number) => (
-            <option key={count} value={count}>
-              ~{count}명
-            </option>
-          ))}
-        </select>
-        {errors.headcount && (
-          <p className="mt-1 text-xs text-[#DC2626]">{errors.headcount}</p>
-        )}
+      <div className="px-5 py-4 space-y-3">
+        <ReviewRow label="신청자" value={`${applicant.name} (${applicant.phone})`} />
+        <ReviewRow label="단체" value={`${applicant.departmentName} > ${applicant.teamName}`} />
+        <ReviewRow label="장소" value={spaceLabel} />
+        <ReviewRow label="인원" value={`${headcount}명`} />
+        <ReviewRow label="일시" value={datetimeLabel} />
+        <ReviewRow label="목적" value={purpose} />
       </div>
 
-      {/* 일시 */}
-      <div>
-        <p className="block text-sm font-medium text-black mb-1">
-          일시 <span className="text-[#DC2626]">*</span>
-        </p>
-        <TimeSlotPicker
-          spaceId={spaceIdForPicker}
-          value={timeSlot}
-          onChange={handleTimeSlotChange}
-        />
-        {errors.start_datetime && (
-          <p className="mt-1 text-xs text-[#DC2626]">{errors.start_datetime}</p>
-        )}
-      </div>
-
-      {/* 사용 목적 */}
-      <div>
-        <label htmlFor="purpose" className="block text-sm font-medium text-black mb-1">
-          사용 목적 <span className="text-[#DC2626]">*</span>
-        </label>
-        <textarea
-          id="purpose"
-          value={formData.purpose}
-          onChange={handleTextChange('purpose')}
-          placeholder="예: 청년부 정기모임"
-          rows={3}
-          className={`w-full rounded-xl border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] resize-none ${
-            errors.purpose ? 'border-[#DC2626] bg-[#DC2626]/5' : 'border-gray-300 bg-white'
-          }`}
-        />
-        {errors.purpose && (
-          <p className="mt-1 text-xs text-[#DC2626]">{errors.purpose}</p>
-        )}
-      </div>
-
-      {/* 제출 에러 메시지 */}
       {submitError && (
-        <div className="rounded-xl bg-[#DC2626]/10 border border-[#DC2626]/30 p-3 text-sm text-[#DC2626]">
+        <div className="mx-5 mb-3 rounded-xl bg-[#DC2626]/10 border border-[#DC2626]/30 p-3 text-sm text-[#DC2626]">
           {submitError}
         </div>
       )}
 
-      {/* 제출 버튼 */}
-      <button
-        type="submit"
-        disabled={isSubmitting}
-        className="w-full rounded-xl bg-[#008F49] px-4 py-3 text-base font-bold text-white transition-colors hover:bg-[#AAA014] disabled:cursor-not-allowed disabled:bg-[#E5E7EB]"
-      >
-        {isSubmitting ? '신청 중...' : '장소 사용 신청'}
-      </button>
-    </form>
+      <div className="px-5 pb-5 flex gap-3">
+        <button
+          type="button"
+          onClick={onEdit}
+          className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+        >
+          수정하기
+        </button>
+        <button
+          type="button"
+          disabled={isSubmitting}
+          onClick={onSubmit}
+          className="flex-1 rounded-xl bg-brand-accent px-4 py-3 text-sm font-bold text-white hover:bg-[#a8784f] active:bg-[#946840] transition-colors disabled:opacity-60"
+        >
+          {isSubmitting ? '신청 중...' : '신청하기'}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function ReviewRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-3 text-sm">
+      <span className="text-brand-accent font-medium w-14 flex-shrink-0">{label}</span>
+      <span className="text-black font-semibold break-words">{value}</span>
+    </div>
   );
 }
 

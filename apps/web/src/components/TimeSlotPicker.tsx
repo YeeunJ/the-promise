@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { TimeSlotValue } from '../types/index';
-import { generateTimeSlots, formatTime } from '../utils/formatDatetime';
+import { generateTimeSlots, formatTime, getKSTDateString } from '../utils/formatDatetime';
 
 interface TimeSlotPickerProps {
   spaceId: number | null;
@@ -16,10 +16,9 @@ interface TimeSlotPickerProps {
  */
 function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.Element {
   const [slots, setSlots] = useState<string[]>([]);
-  const [isLoading] = useState<boolean>(false);
 
-  // 오늘 날짜 (YYYY-MM-DD)
-  const today = new Date().toISOString().split('T')[0];
+  // 오늘 날짜 (YYYY-MM-DD, KST 기준)
+  const today = getKSTDateString();
 
   // spaceId가 실제로 변경될 때만 초기화 (마운트 시 실행 방지)
   const prevSpaceIdRef = React.useRef(spaceId);
@@ -68,7 +67,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
   }
 
   function getSlotStyle(slot: string): string {
-    const base = 'px-2 py-1 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-[#008F49]/20';
+    const base = 'px-2 py-1 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/20';
 
     // endTime 선택 중(startTime만 있는 상태)에서 startTime 이전 슬롯 비활성화
     const isSelectingEnd = value.startTime && !value.endTime;
@@ -77,7 +76,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
     }
 
     if (slot === value.startTime) {
-      return `${base} bg-[#008F49] text-white border-[#008F49] cursor-pointer`;
+      return `${base} bg-brand-primary text-white border-brand-primary cursor-pointer`;
     }
 
     if (slot === value.endTime) {
@@ -85,7 +84,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
     }
 
     if (value.startTime && value.endTime && slot > value.startTime && slot < value.endTime) {
-      return `${base} bg-[#008F49]/10 text-[#008F49] border-[#008F49]/30 cursor-pointer`;
+      return `${base} bg-brand-primary/10 text-brand-primary border-brand-primary/30 cursor-pointer`;
     }
 
     return `${base} bg-white text-gray-700 border-gray-300 hover:bg-gray-50 cursor-pointer`;
@@ -114,7 +113,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
           value={value.date}
           onChange={handleDateChange}
           disabled={isDateDisabled}
-          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49] ${
+          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
             isDateDisabled
               ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
               : 'bg-white text-gray-900 border-gray-300'
@@ -123,7 +122,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
       </div>
 
       {/* 시간 슬롯 */}
-      {value.date && !isLoading && slots.length > 0 && (
+      {value.date && slots.length > 0 && (
         <div>
           <label className="block text-sm font-medium text-black mb-1">
             시간 선택
