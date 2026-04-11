@@ -166,8 +166,8 @@ describe('CalendarGrid', () => {
         onDateSelect={vi.fn()}
       />
     );
-    // ring-2 ring-[#AAA014] 클래스가 적용된 셀이 존재해야 함
-    const selectedCell = container.querySelector('.ring-\\[\\#AAA014\\]');
+    // ring-2 ring-brand-secondary 클래스가 적용된 셀이 존재해야 함
+    const selectedCell = container.querySelector('.ring-brand-secondary');
     expect(selectedCell).toBeInTheDocument();
   });
 

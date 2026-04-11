@@ -98,12 +98,7 @@ describe('validateReservationForm', () => {
 
   it('leader_phone이 빈 문자열이면 에러를 반환한다', () => {
     const errors = validateReservationForm({ ...VALID_FORM, leader_phone: '' });
-    expect(errors.leader_phone).toBe('책임자 연락처를 입력해주세요');
-  });
-
-  it('leader_phone 형식이 잘못되면 형식 에러를 반환한다', () => {
-    const errors = validateReservationForm({ ...VALID_FORM, leader_phone: '010-123-456' });
-    expect(errors.leader_phone).toBe('010-XXXX-XXXX 형식으로 입력해주세요');
+    expect(errors.leader_phone).toBe('담당 교역자를 확인해주세요');
   });
 
   it('space가 0이면 에러를 반환한다', () => {
@@ -126,6 +121,16 @@ describe('validateReservationForm', () => {
     expect(errors.start_datetime).toBe('날짜와 시간을 선택해주세요');
   });
 
+  it('purpose가 빈 문자열이면 에러를 반환한다', () => {
+    const errors = validateReservationForm({ ...VALID_FORM, purpose: '' });
+    expect(errors.purpose).toBe('사용 목적을 입력해주세요');
+  });
+
+  it('purpose가 공백만 있으면 에러를 반환한다', () => {
+    const errors = validateReservationForm({ ...VALID_FORM, purpose: '   ' });
+    expect(errors.purpose).toBe('사용 목적을 입력해주세요');
+  });
+
   it('여러 필드가 동시에 비어있으면 모든 에러를 반환한다', () => {
     const errors = validateReservationForm(INITIAL_FORM_DATA);
     expect(Object.keys(errors).length).toBeGreaterThan(0);
@@ -136,5 +141,6 @@ describe('validateReservationForm', () => {
     expect(errors.space).toBeDefined();
     expect(errors.headcount).toBeDefined();
     expect(errors.start_datetime).toBeDefined();
+    expect(errors.purpose).toBeDefined();
   });
 });
