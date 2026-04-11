@@ -41,9 +41,7 @@ export function validateReservationForm(
   }
 
   if (!formData.leader_phone.trim()) {
-    nextErrors.leader_phone = '책임자 연락처를 입력해주세요';
-  } else if (!PHONE_REGEX.test(formData.leader_phone)) {
-    nextErrors.leader_phone = '010-XXXX-XXXX 형식으로 입력해주세요';
+    nextErrors.leader_phone = '담당 교역자를 확인해주세요';
   }
 
   if (formData.space === 0) {
@@ -56,6 +54,10 @@ export function validateReservationForm(
 
   if (!formData.start_datetime || !formData.end_datetime) {
     nextErrors.start_datetime = '날짜와 시간을 선택해주세요';
+  }
+
+  if (!formData.purpose.trim()) {
+    nextErrors.purpose = '사용 목적을 입력해주세요';
   }
 
   return nextErrors;

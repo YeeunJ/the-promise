@@ -52,6 +52,11 @@ export interface ApiError {
   message: string;
 }
 
+export interface OccupiedSlot {
+  start_datetime: string;
+  end_datetime: string;
+}
+
 export interface TimeSlotValue {
   date: string;
   startTime: string;
@@ -67,7 +72,9 @@ export interface AdminLoginResponse {
   token: string;
 }
 
-export const ADMIN_TOKEN_KEY = 'admin_token';
+export type ActivePopup = 'applicant' | 'space' | 'headcount' | 'datetime' | 'purpose';
+
+export { ADMIN_TOKEN_KEY } from '../lib/constants';
 
 export interface UpdateReservationStatusPayload {
   status: 'confirmed' | 'rejected' | 'cancelled';

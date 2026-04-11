@@ -1,6 +1,10 @@
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
+/** 기본 시간 표시 범위 (HH:MM) */
+export const DEFAULT_START_TIME = '07:00';
+export const DEFAULT_END_TIME = '22:00';
+
 /**
  * ISO 8601 문자열을 Date 객체로 파싱
  */
@@ -60,9 +64,36 @@ export function generateTimeSlots(date: string): string[] {
 }
 
 /**
+ * "YYYY-MM-DD" 문자열을 "2026-04-10 (금)" 형식으로 변환
+ */
+export function formatDateStr(dateStr: string): string {
+  const [yearStr, monthStr, dayStr] = dateStr.split('-');
+  const date = new Date(Number(yearStr), Number(monthStr) - 1, Number(dayStr));
+  const dayLabel = DAY_LABELS[date.getDay()];
+  return `${yearStr}-${monthStr}-${dayStr} (${dayLabel})`;
+}
+
+/**
  * ISO 8601 문자열에서 날짜 부분("YYYY-MM-DD")만 추출
  * 예: "2026-04-10T13:00:00+09:00" → "2026-04-10"
  */
 export function extractDateStr(isoString: string): string {
   return isoString.slice(0, 10);
+}
+
+/**
+ * 현재 KST 날짜를 "YYYY-MM-DD" 형식으로 반환
+ * UTC 기준 toISOString() 대신 KST(+09:00) 기준으로 계산하여
+ * 자정 전후의 날짜 오차를 방지한다.
+ */
+export function getKSTDateString(): string {
+  return new Date(Date.now() + KST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * ISO 8601 문자열에서 시간 부분("HH:MM")을 추출한다.
+ * 예: "2026-04-10T07:30:00+09:00" → "07:30"
+ */
+export function extractTimeHHMM(isoString: string): string {
+  return isoString.slice(11, 16);
 }
