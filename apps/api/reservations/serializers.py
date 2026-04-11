@@ -1,7 +1,13 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Building, Space, Reservation
+from .models import Building, Space, Reservation, Team
+
+
+class TeamSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Team
+        fields = ["id", "name", "leader_phone"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -101,3 +107,33 @@ class SpaceOccupiedSlotSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservation
         fields = ["start_datetime", "end_datetime"]
+
+
+class OverlappingSlotSerializer(serializers.Serializer):
+    start_datetime = serializers.DateTimeField()
+    end_datetime   = serializers.DateTimeField()
+
+
+class SpaceAvailabilitySerializer(serializers.Serializer):
+    id                       = serializers.IntegerField()
+    building                 = BuildingSerializer()
+    name                     = serializers.CharField()
+    floor                    = serializers.IntegerField(allow_null=True)
+    capacity                 = serializers.IntegerField(allow_null=True)
+    description              = serializers.CharField(allow_null=True)
+    availability             = serializers.ChoiceField(choices=["full", "partial", "none"])
+    overlapping_reservations = OverlappingSlotSerializer(many=True)
+
+
+class SpaceAvailabilityQuerySerializer(serializers.Serializer):
+    start_datetime   = serializers.DateTimeField()
+    end_datetime     = serializers.DateTimeField()
+    show_unavailable = serializers.ChoiceField(choices=["Y", "N"])
+    building_id      = serializers.IntegerField(required=False)
+    floor            = serializers.IntegerField(required=False)
+    keyword          = serializers.CharField(required=False)
+
+    def validate(self, data):
+        if data["end_datetime"] <= data["start_datetime"]:
+            raise serializers.ValidationError("종료 일시는 시작 일시보다 늦어야 합니다.")
+        return data

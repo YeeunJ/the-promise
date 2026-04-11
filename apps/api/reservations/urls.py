@@ -1,18 +1,26 @@
 from django.urls import path
 from .views import (
+    TeamListView,
     SpaceListView,
+    SpaceAvailabilityView,
     SpaceReservationListView,
     ReservationListCreateView,
+    ReservationTicketView,
     AdminLoginView,
     AdminReservationListView,
     AdminReservationCancelView,
+    AdminReservationDeleteView,
 )
 
 urlpatterns = [
-    path("spaces/",                               SpaceListView.as_view()),
-    path("spaces/<int:pk>/reservations/",         SpaceReservationListView.as_view()),
-    path("reservations/",                         ReservationListCreateView.as_view()),
-    path("admin/login/",                          AdminLoginView.as_view()),
-    path("admin/reservations/",                   AdminReservationListView.as_view()),
-    path("admin/reservations/<int:pk>/cancel/",   AdminReservationCancelView.as_view()),
+    path("teams/",                                     TeamListView.as_view()),
+    path("spaces/",                                    SpaceListView.as_view()),
+    path("spaces/availability/",                       SpaceAvailabilityView.as_view()),
+    path("spaces/<int:pk>/reservations/",              SpaceReservationListView.as_view()),
+    path("reservations/",                              ReservationListCreateView.as_view()),
+    path("reservations/<int:pk>/ticket/",              ReservationTicketView.as_view()),
+    path("admin/login/",                               AdminLoginView.as_view()),
+    path("admin/reservations/",                        AdminReservationListView.as_view()),
+    path("admin/reservations/<int:pk>/cancel/",        AdminReservationCancelView.as_view()),
+    path("admin/reservations/<int:pk>/",               AdminReservationDeleteView.as_view()),
 ]

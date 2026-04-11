@@ -1,6 +1,9 @@
 import datetime
+import io
 
 from django.contrib.auth import authenticate
+from django.http import HttpResponse
+from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, inline_serializer
 from rest_framework import serializers, status
 from rest_framework.authtoken.models import Token
@@ -8,15 +11,27 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Building, Reservation, Space
+from .models import Building, Reservation, Space, Team
 from .serializers import (
     BuildingWithSpacesSerializer,
+    OverlappingSlotSerializer,
     ReservationCancelSerializer,
     ReservationCreateSerializer,
     ReservationQuerySerializer,
     ReservationSerializer,
+    SpaceAvailabilityQuerySerializer,
+    SpaceAvailabilitySerializer,
     SpaceOccupiedSlotSerializer,
+    TeamSerializer,
 )
+from .ticket import generate_ticket_image
+
+
+class TeamListView(APIView):
+    @extend_schema(responses=TeamSerializer(many=True))
+    def get(self, request):
+        teams = Team.objects.filter(is_active=True)
+        return Response(TeamSerializer(teams, many=True).data)
 
 
 class SpaceListView(APIView):
@@ -36,10 +51,97 @@ class SpaceListView(APIView):
         return Response(serializer.data)
 
 
+class SpaceAvailabilityView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="start_datetime", type=str, required=True,  description="조회 시작일시 (ISO 8601)"),
+            OpenApiParameter(name="end_datetime",   type=str, required=True,  description="조회 종료일시 (ISO 8601)"),
+            OpenApiParameter(name="show_unavailable", type=str, required=True, description="완전 불가능한 방 포함 여부 (Y/N)"),
+            OpenApiParameter(name="building_id",    type=int, required=False, description="건물 필터"),
+            OpenApiParameter(name="floor",          type=int, required=False, description="층 필터"),
+            OpenApiParameter(name="keyword",        type=str, required=False, description="공간 이름 포함 검색"),
+        ],
+        responses={
+            200: SpaceAvailabilitySerializer(many=True),
+            400: OpenApiResponse(
+                response=inline_serializer("SpaceAvailabilityErrorResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="파라미터 오류 — `validation_error`",
+            ),
+        },
+    )
+    def get(self, request):
+        query_serializer = SpaceAvailabilityQuerySerializer(data=request.query_params)
+        if not query_serializer.is_valid():
+            errors = query_serializer.errors
+            if "non_field_errors" in errors:
+                msg = str(errors["non_field_errors"][0])
+            else:
+                msg = str(next(iter(errors.values()))[0])
+            return Response(
+                {"error": "validation_error", "message": msg},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        data             = query_serializer.validated_data
+        S                = data["start_datetime"]
+        E                = data["end_datetime"]
+        show_unavailable = data["show_unavailable"] == "Y"
+
+        spaces = Space.objects.filter(is_active=True).select_related("building")
+        if "building_id" in data:
+            spaces = spaces.filter(building_id=data["building_id"])
+        if "floor" in data:
+            spaces = spaces.filter(floor=data["floor"])
+        if "keyword" in data:
+            spaces = spaces.filter(name__icontains=data["keyword"])
+
+        results = []
+        for space in spaces:
+            overlapping = list(
+                Reservation.objects.filter(
+                    space=space,
+                    status=Reservation.Status.CONFIRMED,
+                    is_deleted=False,
+                    start_datetime__lt=E,
+                    end_datetime__gt=S,
+                ).values("start_datetime", "end_datetime")
+            )
+
+            if not overlapping:
+                availability = "full"
+            elif any(r["start_datetime"] <= S and r["end_datetime"] >= E for r in overlapping):
+                availability = "none"
+            else:
+                availability = "partial"
+
+            if availability == "none" and not show_unavailable:
+                continue
+
+            results.append({
+                "id":          space.id,
+                "building":    space.building,
+                "name":        space.name,
+                "floor":       space.floor,
+                "capacity":    space.capacity,
+                "description": space.description,
+                "availability": availability,
+                "overlapping_reservations": overlapping if availability != "full" else [],
+            })
+
+        order = {"full": 0, "partial": 1, "none": 2}
+        results.sort(key=lambda x: order[x["availability"]])
+
+        serializer = SpaceAvailabilitySerializer(results, many=True)
+        return Response(serializer.data)
+
+
 class ReservationListCreateView(APIView):
     @extend_schema(
         parameters=[
-            OpenApiParameter(name="name", type=str, required=True, description="신청자 이름"),
+            OpenApiParameter(name="name",  type=str, required=True, description="신청자 이름"),
             OpenApiParameter(name="phone", type=str, required=True, description="신청자 연락처"),
         ],
         responses={
@@ -63,6 +165,7 @@ class ReservationListCreateView(APIView):
         reservations = Reservation.objects.filter(
             applicant_name=query_serializer.validated_data["name"],
             applicant_phone=query_serializer.validated_data["phone"],
+            is_deleted=False,
         ).select_related("space__building")
         serializer = ReservationSerializer(reservations, many=True)
         return Response(serializer.data)
@@ -97,6 +200,67 @@ class ReservationListCreateView(APIView):
             ReservationSerializer(reservation).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class ReservationTicketView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="name",  type=str, required=True, description="신청자 이름"),
+            OpenApiParameter(name="phone", type=str, required=True, description="신청자 연락처"),
+        ],
+        responses={
+            200: OpenApiResponse(description="예약 티켓 PNG 이미지"),
+            400: OpenApiResponse(
+                response=inline_serializer("TicketValidationErrorResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="name 또는 phone 파라미터 누락 — `validation_error`",
+            ),
+            403: OpenApiResponse(
+                response=inline_serializer("TicketForbiddenResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="name/phone 불일치 — `forbidden`",
+            ),
+            404: OpenApiResponse(
+                response=inline_serializer("TicketNotFoundResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="예약 없음 또는 삭제된 예약 — `not_found`",
+            ),
+        },
+    )
+    def get(self, request, pk):
+        name  = request.query_params.get("name")
+        phone = request.query_params.get("phone")
+        if not name or not phone:
+            return Response(
+                {"error": "validation_error", "message": "name과 phone 파라미터가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            reservation = Reservation.objects.select_related("space__building").get(
+                pk=pk, is_deleted=False
+            )
+        except Reservation.DoesNotExist:
+            return Response(
+                {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if reservation.applicant_name != name or reservation.applicant_phone != phone:
+            return Response(
+                {"error": "forbidden", "message": "예약 정보가 일치하지 않습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        image  = generate_ticket_image(reservation)
+        buffer = io.BytesIO()
+        image.save(buffer, format="PNG")
+        buffer.seek(0)
+        return HttpResponse(buffer, content_type="image/png")
 
 
 class AdminLoginView(APIView):
@@ -140,7 +304,7 @@ class AdminReservationListView(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter(name="date", type=str, required=False, description="날짜 필터 (예: 2026-04-01)"),
+            OpenApiParameter(name="date",   type=str, required=False, description="날짜 필터 (예: 2026-04-01)"),
             OpenApiParameter(name="status", type=str, required=False, description="상태 필터 (confirmed / rejected / cancelled / pending)"),
         ],
         responses={
@@ -161,7 +325,7 @@ class AdminReservationListView(APIView):
         },
     )
     def get(self, request):
-        qs = Reservation.objects.select_related("space__building")
+        qs = Reservation.objects.filter(is_deleted=False).select_related("space__building")
         date = request.query_params.get("date")
         status_filter = request.query_params.get("status")
         if date:
@@ -177,6 +341,39 @@ class AdminReservationListView(APIView):
             qs = qs.filter(status=status_filter)
         serializer = ReservationSerializer(qs, many=True)
         return Response(serializer.data)
+
+
+class AdminReservationDeleteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        responses={
+            204: OpenApiResponse(description="소프트 삭제 완료"),
+            401: OpenApiResponse(
+                response=inline_serializer("DeleteUnauthorizedResponse", fields={"detail": serializers.CharField()}),
+                description="Authorization 토큰이 없거나 유효하지 않은 경우",
+            ),
+            404: OpenApiResponse(
+                response=inline_serializer("DeleteNotFoundResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="예약 없음 또는 이미 삭제된 예약 — `not_found`",
+            ),
+        },
+    )
+    def delete(self, request, pk):
+        try:
+            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+        except Reservation.DoesNotExist:
+            return Response(
+                {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        reservation.is_deleted = True
+        reservation.deleted_at = timezone.now()
+        reservation.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class SpaceReservationListView(APIView):
@@ -230,6 +427,7 @@ class SpaceReservationListView(APIView):
         reservations = Reservation.objects.filter(
             space_id=pk,
             status=Reservation.Status.CONFIRMED,
+            is_deleted=False,
             start_datetime__date=date,
         ).order_by("start_datetime")
         serializer = SpaceOccupiedSlotSerializer(reservations, many=True)
@@ -271,7 +469,7 @@ class AdminReservationCancelView(APIView):
     )
     def post(self, request, pk):
         try:
-            reservation = Reservation.objects.get(pk=pk)
+            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
         except Reservation.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "예약을 찾을 수 없습니다."},

@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Building, Reservation, Space
+from .models import Building, Reservation, Space, Team
 
 
 class BaseTestCase(TestCase):
@@ -43,10 +43,11 @@ class BaseTestCase(TestCase):
         end_hour=12,
         status=Reservation.Status.CONFIRMED,
         day=1,
+        space=None,
         **kwargs,
     ):
         defaults = dict(
-            space=self.space,
+            space=space or self.space,
             applicant_name="홍길동",
             applicant_phone="01012345678",
             applicant_team="청년부",
@@ -60,6 +61,8 @@ class BaseTestCase(TestCase):
         defaults.update(kwargs)
         return Reservation.objects.create(**defaults)
 
+
+# ─── 기존 테스트 ──────────────────────────────────────────────────────────────
 
 class HasConflictTest(BaseTestCase):
     """Reservation.has_conflict() 모델 메서드"""
@@ -111,6 +114,18 @@ class HasConflictTest(BaseTestCase):
         self._make_reservation(10, 12)
         r = Reservation(
             space=other_space,
+            start_datetime=self._make_dt(10),
+            end_datetime=self._make_dt(12),
+        )
+        self.assertFalse(r.has_conflict())
+
+    def test_no_conflict_with_deleted_reservation(self):
+        # 소프트 삭제된 예약은 충돌 대상이 아님
+        existing = self._make_reservation(10, 12)
+        existing.is_deleted = True
+        existing.save()
+        r = Reservation(
+            space=self.space,
             start_datetime=self._make_dt(10),
             end_datetime=self._make_dt(12),
         )
@@ -202,6 +217,15 @@ class ReservationCreateTest(BaseTestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("validation_error", response.data["error"])
 
+    def test_confirmed_even_if_deleted_reservation_exists(self):
+        # 소프트 삭제된 예약과 시간이 겹쳐도 confirmed
+        r = self._make_reservation(10, 12)
+        r.is_deleted = True
+        r.save()
+        response = self.client.post("/api/v1/reservations/", self._payload(10, 12), format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], "confirmed")
+
 
 class ReservationListViewTest(BaseTestCase):
     """GET /api/v1/reservations/"""
@@ -226,6 +250,16 @@ class ReservationListViewTest(BaseTestCase):
         response = self.client.get("/api/v1/reservations/")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
+
+    def test_deleted_reservation_not_returned(self):
+        r = self._make_reservation()
+        r.is_deleted = True
+        r.save()
+        response = self.client.get(
+            "/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
 
 
 class SpaceReservationListViewTest(BaseTestCase):
@@ -265,6 +299,14 @@ class SpaceReservationListViewTest(BaseTestCase):
         response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "abc"})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
+
+    def test_excludes_deleted_reservations(self):
+        r = self._make_reservation(start_hour=10, end_hour=12)
+        r.is_deleted = True
+        r.save()
+        response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "2030-06-01"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
 
 
 class AdminLoginViewTest(BaseTestCase):
@@ -328,6 +370,14 @@ class AdminReservationListViewTest(BaseTestCase):
         self.assertEqual(len(response.data), 1)
         self.assertEqual(response.data[0]["status"], "confirmed")
 
+    def test_deleted_reservation_not_returned(self):
+        r = self._make_reservation()
+        r.is_deleted = True
+        r.save()
+        response = self.client.get("/api/v1/admin/reservations/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 0)
+
 
 class AdminReservationCancelViewTest(BaseTestCase):
     """POST /api/v1/admin/reservations/<id>/cancel/"""
@@ -385,3 +435,297 @@ class AdminReservationCancelViewTest(BaseTestCase):
             f"/api/v1/admin/reservations/{r.pk}/cancel/", {}, format="json"
         )
         self.assertEqual(response.status_code, 401)
+
+    def test_deleted_reservation_cancel_returns_404(self):
+        r = self._make_reservation()
+        r.is_deleted = True
+        r.save()
+        response = self.client.post(
+            f"/api/v1/admin/reservations/{r.pk}/cancel/", {}, format="json"
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
+
+
+# ─── 신규 테스트 ──────────────────────────────────────────────────────────────
+
+class TeamListViewTest(BaseTestCase):
+    """GET /api/v1/teams/"""
+
+    def test_returns_active_teams(self):
+        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
+        Team.objects.create(name="찬양팀", leader_phone="01098765432", is_active=True)
+        response = self.client.get("/api/v1/teams/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data), 2)
+
+    def test_inactive_team_excluded(self):
+        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
+        Team.objects.create(name="비활성팀", leader_phone="01099999999", is_active=False)
+        response = self.client.get("/api/v1/teams/")
+        names = [t["name"] for t in response.data]
+        self.assertNotIn("비활성팀", names)
+
+    def test_returns_empty_when_no_teams(self):
+        response = self.client.get("/api/v1/teams/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data, [])
+
+    def test_response_includes_leader_phone(self):
+        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
+        response = self.client.get("/api/v1/teams/")
+        self.assertIn("leader_phone", response.data[0])
+        self.assertEqual(response.data[0]["leader_phone"], "01012345678")
+
+
+class SpaceAvailabilityViewTest(BaseTestCase):
+    """GET /api/v1/spaces/availability/"""
+
+    BASE_URL = "/api/v1/spaces/availability/"
+
+    def _params(self, **kwargs):
+        defaults = {
+            "start_datetime": "2030-06-01T10:00:00+09:00",
+            "end_datetime":   "2030-06-01T12:00:00+09:00",
+            "show_unavailable": "Y",
+        }
+        defaults.update(kwargs)
+        return defaults
+
+    def _result_for(self, response, space_pk):
+        return next(r for r in response.data if r["id"] == space_pk)
+
+    def test_full_when_no_reservations(self):
+        response = self.client.get(self.BASE_URL, self._params())
+        self.assertEqual(response.status_code, 200)
+        result = self._result_for(response, self.space.pk)
+        self.assertEqual(result["availability"], "full")
+        self.assertEqual(result["overlapping_reservations"], [])
+
+    def test_partial_when_partially_overlapping(self):
+        # 기존 예약 09:00~11:00 → 요청 10:00~12:00과 부분 겹침
+        self._make_reservation(start_hour=9, end_hour=11)
+        response = self.client.get(self.BASE_URL, self._params())
+        result = self._result_for(response, self.space.pk)
+        self.assertEqual(result["availability"], "partial")
+        self.assertEqual(len(result["overlapping_reservations"]), 1)
+
+    def test_none_when_fully_blocked(self):
+        # 기존 예약 08:00~14:00 → 요청 10:00~12:00 전체 차단
+        self._make_reservation(start_hour=8, end_hour=14)
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="Y"))
+        result = self._result_for(response, self.space.pk)
+        self.assertEqual(result["availability"], "none")
+
+    def test_none_excluded_when_show_unavailable_N(self):
+        self._make_reservation(start_hour=8, end_hour=14)
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="N"))
+        ids = [r["id"] for r in response.data]
+        self.assertNotIn(self.space.pk, ids)
+
+    def test_partial_included_when_show_unavailable_N(self):
+        # show_unavailable=N이어도 partial은 포함됨
+        self._make_reservation(start_hour=9, end_hour=11)
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="N"))
+        ids = [r["id"] for r in response.data]
+        self.assertIn(self.space.pk, ids)
+
+    def test_sorted_full_before_partial_before_none(self):
+        space_partial = Space.objects.create(building=self.building, name="부분공간", floor=2, is_active=True)
+        space_none    = Space.objects.create(building=self.building, name="차단공간", floor=3, is_active=True)
+
+        # space_partial: 부분 겹침 (09:00~11:00)
+        self._make_reservation(start_hour=9, end_hour=11, space=space_partial)
+        # space_none: 전체 차단 (08:00~14:00)
+        self._make_reservation(start_hour=8, end_hour=14, space=space_none)
+
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="Y"))
+        self.assertEqual(response.status_code, 200)
+        availabilities = [r["availability"] for r in response.data]
+        full_idx    = availabilities.index("full")
+        partial_idx = availabilities.index("partial")
+        none_idx    = availabilities.index("none")
+        self.assertLess(full_idx, partial_idx)
+        self.assertLess(partial_idx, none_idx)
+
+    def test_filter_by_building_id(self):
+        other_building = Building.objects.create(name="다른건물", is_active=True)
+        Space.objects.create(building=other_building, name="다른공간", is_active=True)
+        response = self.client.get(self.BASE_URL, self._params(building_id=self.building.pk))
+        building_ids = {r["building"]["id"] for r in response.data}
+        self.assertEqual(building_ids, {self.building.pk})
+
+    def test_filter_by_floor(self):
+        Space.objects.create(building=self.building, name="2층공간", floor=2, is_active=True)
+        response = self.client.get(self.BASE_URL, self._params(floor=1))
+        floors = {r["floor"] for r in response.data}
+        self.assertNotIn(2, floors)
+
+    def test_filter_by_keyword(self):
+        response = self.client.get(self.BASE_URL, self._params(keyword="자람"))
+        names = [r["name"] for r in response.data]
+        self.assertIn("자람뜰홀", names)
+        self.assertEqual(len(response.data), 1)
+
+    def test_400_when_end_before_start(self):
+        response = self.client.get(self.BASE_URL, self._params(
+            start_datetime="2030-06-01T12:00:00+09:00",
+            end_datetime="2030-06-01T10:00:00+09:00",
+        ))
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_400_when_required_params_missing(self):
+        response = self.client.get(self.BASE_URL, {"show_unavailable": "Y"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_inactive_space_excluded(self):
+        response = self.client.get(self.BASE_URL, self._params())
+        ids = [r["id"] for r in response.data]
+        self.assertNotIn(self.inactive_space.pk, ids)
+
+    def test_soft_deleted_reservation_treated_as_no_reservation(self):
+        # 소프트 삭제된 예약은 가용성 계산에서 제외 → full
+        r = self._make_reservation(start_hour=8, end_hour=14)
+        r.is_deleted = True
+        r.save()
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="Y"))
+        result = self._result_for(response, self.space.pk)
+        self.assertEqual(result["availability"], "full")
+
+    def test_cancelled_reservation_not_counted(self):
+        # cancelled 예약은 충돌 대상 아님 → full
+        self._make_reservation(start_hour=8, end_hour=14, status=Reservation.Status.CANCELLED)
+        response = self.client.get(self.BASE_URL, self._params(show_unavailable="Y"))
+        result = self._result_for(response, self.space.pk)
+        self.assertEqual(result["availability"], "full")
+
+    def test_partial_returns_overlapping_slots(self):
+        self._make_reservation(start_hour=9, end_hour=11)
+        response = self.client.get(self.BASE_URL, self._params())
+        result = self._result_for(response, self.space.pk)
+        slot = result["overlapping_reservations"][0]
+        self.assertIn("start_datetime", slot)
+        self.assertIn("end_datetime", slot)
+
+
+class AdminReservationDeleteViewTest(BaseTestCase):
+    """DELETE /api/v1/admin/reservations/<id>/"""
+
+    def setUp(self):
+        super().setUp()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def test_soft_delete_success(self):
+        r = self._make_reservation()
+        response = self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        self.assertEqual(response.status_code, 204)
+        r.refresh_from_db()
+        self.assertTrue(r.is_deleted)
+        self.assertIsNotNone(r.deleted_at)
+
+    def test_row_still_exists_in_db_after_delete(self):
+        r = self._make_reservation()
+        self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        self.assertTrue(Reservation.objects.filter(pk=r.pk).exists())
+
+    def test_deleted_not_in_general_list(self):
+        r = self._make_reservation()
+        self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        response = self.client.get("/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"})
+        self.assertEqual(len(response.data), 0)
+
+    def test_deleted_not_in_admin_list(self):
+        r = self._make_reservation()
+        self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        response = self.client.get("/api/v1/admin/reservations/")
+        self.assertEqual(len(response.data), 0)
+
+    def test_already_deleted_returns_404(self):
+        r = self._make_reservation()
+        self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        response = self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
+
+    def test_not_found_returns_404(self):
+        response = self.client.delete("/api/v1/admin/reservations/9999/")
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
+
+    def test_401_without_token(self):
+        self.client.credentials()
+        r = self._make_reservation()
+        response = self.client.delete(f"/api/v1/admin/reservations/{r.pk}/")
+        self.assertEqual(response.status_code, 401)
+
+
+class ReservationTicketViewTest(BaseTestCase):
+    """GET /api/v1/reservations/<id>/ticket/"""
+
+    def test_returns_png_image(self):
+        r = self._make_reservation()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"name": "홍길동", "phone": "01012345678"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        # PNG magic bytes
+        self.assertTrue(response.content.startswith(b"\x89PNG"))
+
+    def test_403_when_name_mismatch(self):
+        r = self._make_reservation()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"name": "김철수", "phone": "01012345678"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "forbidden")
+
+    def test_403_when_phone_mismatch(self):
+        r = self._make_reservation()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"name": "홍길동", "phone": "01099999999"},
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.json()["error"], "forbidden")
+
+    def test_400_when_name_missing(self):
+        r = self._make_reservation()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"phone": "01012345678"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "validation_error")
+
+    def test_400_when_phone_missing(self):
+        r = self._make_reservation()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"name": "홍길동"},
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "validation_error")
+
+    def test_404_when_reservation_not_found(self):
+        response = self.client.get(
+            "/api/v1/reservations/9999/ticket/",
+            {"name": "홍길동", "phone": "01012345678"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "not_found")
+
+    def test_404_when_reservation_is_deleted(self):
+        r = self._make_reservation()
+        r.is_deleted = True
+        r.save()
+        response = self.client.get(
+            f"/api/v1/reservations/{r.pk}/ticket/",
+            {"name": "홍길동", "phone": "01012345678"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.json()["error"], "not_found")
