@@ -1,5 +1,5 @@
 import { Reservation, ReservationStatus } from '../../types/index';
-import { extractDateStr } from '../../utils/formatDatetime';
+import { extractDateStr, getKSTDateString } from '../../utils/formatDatetime';
 
 interface CalendarGridProps {
   currentYear: number;
@@ -17,8 +17,8 @@ const DAY_HEADER_COLOR: Record<number, string> = {
 };
 
 const CHIP_CLASS: Record<ReservationStatus, string> = {
-  confirmed: 'bg-[#008F49]/10 border-l-[3px] border-[#008F49] text-[#008F49] hover:bg-[#008F49]/20',
-  pending:   'bg-[#AAA014]/10 border-l-[3px] border-[#AAA014] text-[#AAA014] hover:bg-[#AAA014]/20',
+  confirmed: 'bg-brand-primary/10 border-l-[3px] border-brand-primary text-brand-primary hover:bg-brand-primary/20',
+  pending:   'bg-brand-secondary/10 border-l-[3px] border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20',
   rejected:  'bg-[#DC2626]/10 border-l-[3px] border-[#DC2626] text-[#DC2626] hover:bg-[#DC2626]/20',
   cancelled: 'bg-gray-100 border-l-[3px] border-gray-400 text-gray-500 hover:bg-gray-200',
 };
@@ -60,10 +60,10 @@ function renderChips(dayReservations: Reservation[]): JSX.Element {
         </span>
       ))}
       {dayReservations.length > 0 && (
-        <span className="sm:hidden w-1.5 h-1.5 rounded-full bg-[#008F49] mt-1" />
+        <span className="sm:hidden w-1.5 h-1.5 rounded-full bg-brand-primary mt-1" />
       )}
       {remaining > 0 && (
-        <span className="text-xs text-[#BC8A5F] font-medium pl-1 hidden sm:inline">
+        <span className="text-xs text-brand-accent font-medium pl-1 hidden sm:inline">
           +{remaining} more
         </span>
       )}
@@ -78,7 +78,7 @@ function CalendarGrid({
   selectedDate,
   onDateSelect,
 }: CalendarGridProps): JSX.Element {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = getKSTDateString();
   const days = buildCalendarDays(currentYear, currentMonth);
   const byDate = groupByDate(reservations);
 
@@ -121,17 +121,17 @@ function CalendarGrid({
 
           let cellClass = 'min-h-[145px] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
           if (isToday) {
-            cellClass += ' bg-[#008F49]/5 ring-1 ring-inset ring-[#008F49]/30';
+            cellClass += ' bg-brand-primary/5 ring-1 ring-inset ring-brand-primary/30';
           } else {
             cellClass += ' hover:bg-gray-50';
           }
           if (isSelected) {
-            cellClass += ' ring-2 ring-[#AAA014]';
+            cellClass += ' ring-2 ring-brand-secondary';
           }
 
           let dateNumClass = 'text-sm font-medium self-start';
           if (isToday) {
-            dateNumClass = 'w-7 h-7 flex items-center justify-center rounded-full bg-[#008F49] text-white font-bold text-sm';
+            dateNumClass = 'w-7 h-7 flex items-center justify-center rounded-full bg-brand-primary text-white font-bold text-sm';
           } else if (colIndex === 0) {
             dateNumClass += ' text-[#DC2626]';
           } else if (colIndex === 6) {

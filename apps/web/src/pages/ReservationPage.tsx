@@ -12,82 +12,71 @@ function ReservationPage(): JSX.Element {
   const [submittedReservation, setSubmittedReservation] = useState<Reservation | null>(null);
   const [lookupResults, setLookupResults] = useState<Reservation[]>([]);
 
-  function handleSubmitSuccess(reservation: Reservation) {
-    setSubmittedReservation(reservation);
-  }
-
-  function handleReset() {
-    setSubmittedReservation(null);
-  }
-
-  function handleLookupResult(reservations: Reservation[]) {
-    setLookupResults(reservations);
-  }
-
   function handleTabChange(tab: ActiveTab) {
     setActiveTab(tab);
+    if (tab === 'apply') setLookupResults([]);
   }
 
   return (
-    <div className="min-h-screen bg-[#FEFAE0]">
-      {/* 페이지 헤더 */}
-      <header className="bg-white border-b border-gray-200">
-        <div className="max-w-[600px] mx-auto px-4 py-5">
-          <h1 className="text-xl font-bold text-black">장소 사용 신청</h1>
+    <div className="min-h-screen bg-brand-cream flex flex-col">
+      {/* 헤더 */}
+      <header className="bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="max-w-screen-xl mx-auto px-6 py-5 flex items-center">
+          <div className="flex items-center gap-3">
+            <span className="text-2xl font-black text-brand-primary tracking-tight">가나안교회</span>
+            <span className="text-gray-300">|</span>
+            <span className="text-lg font-semibold text-black">장소 사용 신청</span>
+          </div>
         </div>
       </header>
 
-      {/* 탭 네비게이션 */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-[600px] mx-auto px-4">
-          <nav className="flex">
-            <button
-              type="button"
-              onClick={() => handleTabChange('apply')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'apply'
-                  ? 'border-[#008F49] text-[#008F49]'
-                  : 'border-transparent text-gray-500 hover:text-[#008F49]'
-              }`}
-            >
-              예약 신청
-            </button>
-            <button
-              type="button"
-              onClick={() => handleTabChange('lookup')}
-              className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
-                activeTab === 'lookup'
-                  ? 'border-[#008F49] text-[#008F49]'
-                  : 'border-transparent text-gray-500 hover:text-[#008F49]'
-              }`}
-            >
-              내 예약 조회
-            </button>
+      {/* 탭 */}
+      <div className="bg-white border-b border-gray-200 flex-shrink-0">
+        <div className="max-w-screen-xl mx-auto px-6">
+          <nav aria-label="페이지 탭" className="flex gap-1">
+            {(['apply', 'lookup'] as const).map((tab) => (
+              <button
+                key={tab}
+                type="button"
+                onClick={() => handleTabChange(tab)}
+                className={`px-5 py-3.5 text-sm font-semibold border-b-2 transition-colors ${
+                  activeTab === tab
+                    ? 'border-brand-primary text-brand-primary'
+                    : 'border-transparent text-gray-500 hover:text-brand-primary'
+                }`}
+              >
+                {tab === 'apply' ? '예약 신청' : '내 예약 조회'}
+              </button>
+            ))}
           </nav>
         </div>
       </div>
 
-      {/* 탭 콘텐츠 */}
-      <main className="max-w-[600px] mx-auto px-4 py-6">
+      {/* 메인 */}
+      <main className="flex-1 flex flex-col">
         {activeTab === 'apply' && (
-          <div>
+          <div className="flex-1 flex items-center justify-center px-6 py-10">
             {submittedReservation === null ? (
-              <ReservationForm onSubmitSuccess={handleSubmitSuccess} />
+              <ReservationForm onSubmitSuccess={(r) => setSubmittedReservation(r)} />
             ) : (
-              <ReservationSummary
-                reservation={submittedReservation}
-                onReset={handleReset}
-              />
+              <div className="w-full max-w-lg">
+                <ReservationSummary
+                  reservation={submittedReservation}
+                  onReset={() => setSubmittedReservation(null)}
+                />
+              </div>
             )}
           </div>
         )}
 
         {activeTab === 'lookup' && (
-          <div className="space-y-6">
-            <LookupForm onResult={handleLookupResult} />
-            {lookupResults.length > 0 && (
-              <ReservationTable reservations={lookupResults} />
-            )}
+          <div className="max-w-screen-xl mx-auto px-6 py-8">
+            <div className="max-w-lg mx-auto space-y-6">
+              <LookupForm onResult={(r) => setLookupResults(r)} />
+              {lookupResults.length > 0 && (
+                <ReservationTable reservations={lookupResults} />
+              )}
+            </div>
           </div>
         )}
       </main>

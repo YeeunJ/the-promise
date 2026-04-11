@@ -59,7 +59,7 @@ function LookupForm({ onResult }: LookupFormProps): JSX.Element {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="신청자 이름"
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary"
         />
       </div>
 
@@ -76,7 +76,7 @@ function LookupForm({ onResult }: LookupFormProps): JSX.Element {
           value={phone}
           onChange={handlePhoneChange}
           placeholder="010-0000-0000"
-          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:border-[#008F49]"
+          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary"
         />
       </div>
 
@@ -87,7 +87,7 @@ function LookupForm({ onResult }: LookupFormProps): JSX.Element {
       <button
         type="submit"
         disabled={isLoading}
-        className="w-full py-3 px-4 bg-[#008F49] text-white font-bold text-base rounded-xl hover:bg-[#AAA014] focus:outline-none focus:ring-2 focus:ring-[#008F49]/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+        className="w-full py-3 px-4 bg-brand-primary text-white font-bold text-base rounded-xl hover:bg-brand-secondary focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {isLoading ? '조회 중...' : '예약 조회'}
       </button>

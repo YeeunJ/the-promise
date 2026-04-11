@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import axios, { isAxiosError } from 'axios';
 import type { AdminLoginRequest, AdminLoginResponse } from '../types';
-import { ADMIN_TOKEN_KEY } from '../types';
+import { ADMIN_TOKEN_KEY } from '../lib/constants';
 
 interface AdminLoginFormProps {
   onLoginSuccess: () => void;
@@ -27,10 +27,10 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
       localStorage.setItem(ADMIN_TOKEN_KEY, response.data.token);
       onLoginSuccess();
     } catch (error) {
-      if (isAxiosError(error)) {
+      if (isAxiosError(error) && error.response) {
         setErrorMessage('아이디 또는 비밀번호가 올바르지 않습니다.');
       } else {
-        setErrorMessage('아이디 또는 비밀번호가 올바르지 않습니다.');
+        setErrorMessage('네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
       }
     } finally {
       setIsLoading(false);
@@ -38,7 +38,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-[#FEFAE0] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-md border border-[#E5E7EB] w-full max-w-sm px-8 py-10">
         <h1 className="text-2xl font-black text-black text-center mb-8">관리자 로그인</h1>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -51,7 +51,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-[#008F49] focus:ring-2 focus:ring-[#008F49]/20 transition-colors duration-200"
+              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-colors duration-200"
               autoComplete="username"
               required
             />
@@ -65,7 +65,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-[#008F49] focus:ring-2 focus:ring-[#008F49]/20 transition-colors duration-200"
+              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-colors duration-200"
               autoComplete="current-password"
               required
             />
@@ -76,7 +76,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-xl bg-[#008F49] px-4 py-3 text-base font-bold text-white hover:bg-[#AAA014] disabled:bg-[#E5E7EB] disabled:cursor-not-allowed transition-colors duration-300"
+            className="w-full rounded-xl bg-brand-primary px-4 py-3 text-base font-bold text-white hover:bg-brand-secondary disabled:bg-[#E5E7EB] disabled:cursor-not-allowed transition-colors duration-300"
           >
             {isLoading ? '로그인 중...' : '로그인'}
           </button>

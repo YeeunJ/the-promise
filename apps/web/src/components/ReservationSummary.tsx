@@ -15,7 +15,7 @@ function getStatusBannerConfig(status: ReservationStatus): StatusBannerConfig {
   if (status === 'confirmed') {
     return {
       message: '예약이 확정되었습니다',
-      className: 'bg-[#008F49]/10 text-[#008F49] border border-[#008F49]/30',
+      className: 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30',
     };
   }
   if (status === 'rejected') {
@@ -57,37 +57,37 @@ function ReservationSummary({ reservation, onReset }: ReservationSummaryProps): 
 
           <dl className="space-y-3">
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">신청 번호</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">신청 번호</dt>
               <dd className="text-sm font-medium text-black">{reservation.id}</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">신청자 이름</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">신청자 이름</dt>
               <dd className="text-sm font-medium text-black">{reservation.applicant_name}</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">단체명</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">단체명</dt>
               <dd className="text-sm font-medium text-black">{reservation.applicant_team}</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">공간</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">공간</dt>
               <dd className="text-sm font-medium text-black">{spaceLabel}</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">날짜·시간</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">날짜·시간</dt>
               <dd className="text-sm font-medium text-black">{datetimeLabel}</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">인원</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">인원</dt>
               <dd className="text-sm font-medium text-black">{reservation.headcount}명</dd>
             </div>
 
             <div className="flex">
-              <dt className="w-28 flex-shrink-0 text-sm text-[#BC8A5F]">사용 목적</dt>
+              <dt className="w-28 flex-shrink-0 text-sm text-brand-accent">사용 목적</dt>
               <dd className="text-sm font-medium text-black whitespace-pre-wrap">{reservation.purpose}</dd>
             </div>
           </dl>
@@ -97,7 +97,7 @@ function ReservationSummary({ reservation, onReset }: ReservationSummaryProps): 
           <button
             type="button"
             onClick={onReset}
-            className="w-full py-2.5 px-4 bg-[#008F49] hover:bg-[#AAA014] active:bg-[#007A3D] text-white text-base font-bold rounded-xl transition-colors duration-150"
+            className="w-full py-2.5 px-4 bg-brand-primary hover:bg-brand-secondary active:bg-[#007A3D] text-white text-base font-bold rounded-xl transition-colors duration-150"
           >
             새 신청하기
           </button>

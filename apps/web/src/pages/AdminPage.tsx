@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import type { Reservation } from '../types';
-import { ADMIN_TOKEN_KEY } from '../types';
+import { ADMIN_TOKEN_KEY } from '../lib/constants';
 import AdminLoginForm from '../components/AdminLoginForm';
 import CalendarGrid from '../components/admin/CalendarGrid';
 import ReservationPanel from '../components/admin/ReservationPanel';
@@ -73,14 +73,14 @@ function AdminPage(): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-[#FEFAE0]">
+    <div className="min-h-screen bg-brand-cream">
       <header className="bg-white border-b border-[#E5E7EB]">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <h1 className="text-xl font-bold text-black">어드민 대시보드</h1>
           <button
             type="button"
             onClick={handleLogout}
-            className="rounded-xl px-4 py-2 text-sm font-medium border-2 border-[#AAA014] text-[#AAA014] hover:bg-[#AAA014] hover:text-white transition-colors duration-200"
+            className="rounded-xl px-4 py-2 text-sm font-medium border-2 border-brand-secondary text-brand-secondary hover:bg-brand-secondary hover:text-white transition-colors duration-200"
           >
             로그아웃
           </button>
@@ -93,7 +93,7 @@ function AdminPage(): JSX.Element {
             <span className="block text-5xl font-black text-black leading-none">
               {MONTH_NAMES[currentMonth - 1]}
             </span>
-            <span className="block text-xl font-normal text-[#BC8A5F] mt-1">
+            <span className="block text-xl font-normal text-brand-accent mt-1">
               {currentYear}
             </span>
           </div>
@@ -101,14 +101,14 @@ function AdminPage(): JSX.Element {
             <button
               type="button"
               onClick={handlePrevMonth}
-              className="w-12 h-12 rounded-[14px] border-2 border-[#AAA014] text-[#AAA014] flex items-center justify-center hover:bg-[#AAA014] hover:text-white transition-colors duration-200"
+              className="w-12 h-12 rounded-[14px] border-2 border-brand-secondary text-brand-secondary flex items-center justify-center hover:bg-brand-secondary hover:text-white transition-colors duration-200"
             >
               ◀
             </button>
             <button
               type="button"
               onClick={handleNextMonth}
-              className="w-12 h-12 rounded-[14px] border-2 border-[#AAA014] text-[#AAA014] flex items-center justify-center hover:bg-[#AAA014] hover:text-white transition-colors duration-200"
+              className="w-12 h-12 rounded-[14px] border-2 border-brand-secondary text-brand-secondary flex items-center justify-center hover:bg-brand-secondary hover:text-white transition-colors duration-200"
             >
               ▶
             </button>
@@ -123,7 +123,7 @@ function AdminPage(): JSX.Element {
 
         {isLoading ? (
           <div className="flex items-center justify-center py-20">
-            <div className="h-8 w-8 animate-spin rounded-full border-2 border-[#008F49] border-t-transparent" />
+            <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-primary border-t-transparent" />
           </div>
         ) : (
           <div className="flex flex-col lg:flex-row gap-6">

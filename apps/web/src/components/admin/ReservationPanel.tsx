@@ -1,21 +1,10 @@
 import { useState } from 'react';
 import axios from 'axios';
-import { Reservation, ReservationStatus, ADMIN_TOKEN_KEY } from '../../types/index';
+import type { Reservation, ReservationStatus } from '../../types/index';
+import { ADMIN_TOKEN_KEY } from '../../lib/constants';
 import { extractDateStr, formatDatetimeRange } from '../../utils/formatDatetime';
-
-const STATUS_LABEL: Record<ReservationStatus, string> = {
-  confirmed: '확정',
-  pending: '대기',
-  rejected: '거절',
-  cancelled: '취소',
-};
-
-const STATUS_CLASS: Record<ReservationStatus, string> = {
-  confirmed: 'bg-[#008F49]/10 text-[#008F49] border border-[#008F49]/30',
-  pending: 'bg-[#AAA014]/10 text-[#AAA014] border border-[#AAA014]/30',
-  rejected: 'bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30',
-  cancelled: 'bg-[#E5E7EB] text-gray-600 border border-gray-300',
-};
+import { formatSpaceName } from '../../utils/formatSpaceName';
+import { StatusBadge } from '../ui/StatusBadge';
 
 interface ReservationPanelProps {
   selectedDate: string | null;
@@ -23,20 +12,31 @@ interface ReservationPanelProps {
   onCancelSuccess: () => void;
 }
 
-function formatSpaceName(r: Reservation): string {
-  const floor = r.space.floor !== null ? `${r.space.floor}층 ` : '';
-  return `${r.space.building.name} ${floor}${r.space.name}`;
-}
-
 function ReservationPanel({ selectedDate, reservations, onCancelSuccess }: ReservationPanelProps): JSX.Element {
   const [cancellingId, setCancellingId] = useState<number | null>(null);
+  const [confirmingId, setConfirmingId] = useState<number | null>(null);
   const [cancelError, setCancelError] = useState<string | null>(null);
 
   const dayReservations = selectedDate
     ? reservations.filter(r => extractDateStr(r.start_datetime) === selectedDate)
     : [];
 
-  async function handleCancel(id: number) {
+  function handleCancelClick(id: number) {
+    setConfirmingId(id);
+  }
+
+  function handleCancelConfirm() {
+    if (confirmingId !== null) {
+      void executeCancellation(confirmingId);
+      setConfirmingId(null);
+    }
+  }
+
+  function handleCancelAbort() {
+    setConfirmingId(null);
+  }
+
+  async function executeCancellation(id: number) {
     setCancellingId(id);
     setCancelError(null);
     try {
@@ -64,13 +64,13 @@ function ReservationPanel({ selectedDate, reservations, onCancelSuccess }: Reser
       </h2>
 
       {!selectedDate && (
-        <p className="text-sm text-[#BC8A5F] text-center py-8">
+        <p className="text-sm text-brand-accent text-center py-8">
           날짜를 선택하면 예약 목록이 표시됩니다
         </p>
       )}
 
       {selectedDate && dayReservations.length === 0 && (
-        <p className="text-sm text-[#BC8A5F] text-center py-8">
+        <p className="text-sm text-brand-accent text-center py-8">
           해당 날짜에 예약이 없습니다
         </p>
       )}
@@ -79,7 +79,7 @@ function ReservationPanel({ selectedDate, reservations, onCancelSuccess }: Reser
         <ul className="space-y-3">
           {dayReservations.map(r => (
             <li key={r.id} className="bg-white border border-[#E5E7EB] rounded-xl p-4 space-y-2">
-              <p className="text-sm font-medium text-black">{formatSpaceName(r)}</p>
+              <p className="text-sm font-medium text-black">{formatSpaceName(r.space)}</p>
               <p className="text-sm text-gray-600">
                 {formatDatetimeRange(r.start_datetime, r.end_datetime)}
               </p>
@@ -87,19 +87,35 @@ function ReservationPanel({ selectedDate, reservations, onCancelSuccess }: Reser
                 {r.applicant_name} · {r.applicant_team}
               </p>
               <div className="flex items-center justify-between">
-                <span
-                  className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium ${STATUS_CLASS[r.status]}`}
-                >
-                  {STATUS_LABEL[r.status]}
-                </span>
-                <button
-                  type="button"
-                  disabled={!isCancellable(r.status) || cancellingId === r.id}
-                  onClick={() => handleCancel(r.id)}
-                  className={`rounded-xl border-2 border-[#E5E7EB] py-1.5 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed`}
-                >
-                  {cancellingId === r.id ? '취소 중...' : '취소'}
-                </button>
+                <StatusBadge status={r.status} />
+                {confirmingId === r.id ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-600">정말 취소하시겠습니까?</span>
+                    <button
+                      type="button"
+                      onClick={handleCancelConfirm}
+                      className="rounded-xl bg-[#DC2626] py-1.5 px-3 text-xs font-medium text-white hover:bg-[#B91C1C] transition-colors"
+                    >
+                      확인
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleCancelAbort}
+                      className="rounded-xl border-2 border-[#E5E7EB] py-1.5 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                    >
+                      아니오
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={!isCancellable(r.status) || cancellingId === r.id}
+                    onClick={() => handleCancelClick(r.id)}
+                    className="rounded-xl border-2 border-[#E5E7EB] py-1.5 px-3 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {cancellingId === r.id ? '취소 중...' : '취소'}
+                  </button>
+                )}
               </div>
             </li>
           ))}
