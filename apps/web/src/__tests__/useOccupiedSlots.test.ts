@@ -48,7 +48,7 @@ describe('useOccupiedSlots', () => {
     expect(result.current.occupiedSlots).toEqual(data);
     expect(result.current.error).toBeNull();
     expect(mockFetch).toHaveBeenCalledWith(
-      '/api/v1/spaces/1/reservations/?date=2026-04-10',
+      `${import.meta.env.VITE_API_BASE_URL}/api/v1/spaces/1/reservations/?date=2026-04-10`,
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     );
   });

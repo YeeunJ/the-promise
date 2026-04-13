@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import axios from 'axios';
 import ReservationPanel from '../components/admin/ReservationPanel';
 import type { Reservation } from '../types';
+
+vi.mock('axios');
+const mockedAxios = vi.mocked(axios);
 
 function makeReservation(overrides: Partial<Reservation> = {}): Reservation {
   return {
@@ -269,5 +274,35 @@ describe('ReservationPanel', () => {
     );
     expect(screen.getByText('홍길동 · 청년부')).toBeInTheDocument();
     expect(screen.getByText('김철수 · 장년부')).toBeInTheDocument();
+  });
+
+  it('취소 확인 시 axios.post로 /cancel/ 엔드포인트를 호출한다', async () => {
+    const user = userEvent.setup();
+    const token = 'test-token';
+    localStorage.setItem('admin_token', token);
+    mockedAxios.post.mockResolvedValueOnce({ data: {} });
+
+    const onCancelSuccess = vi.fn();
+    const reservation = makeReservation({ id: 42, status: 'confirmed' });
+
+    render(
+      <ReservationPanel
+        selectedDate="2026-04-10"
+        reservations={[reservation]}
+        onCancelSuccess={onCancelSuccess}
+      />
+    );
+
+    // 취소 버튼 클릭 → 확인 다이얼로그 표시
+    await user.click(screen.getByRole('button', { name: '취소' }));
+    // 확인 버튼 클릭 → executeCancellation 실행
+    await user.click(screen.getByRole('button', { name: '확인' }));
+
+    expect(mockedAxios.post).toHaveBeenCalledWith(
+      `${import.meta.env.VITE_API_BASE_URL}/api/v1/admin/reservations/42/cancel/`,
+      { admin_note: '' },
+      { headers: { Authorization: `Token ${token}` } }
+    );
+    expect(onCancelSuccess).toHaveBeenCalled();
   });
 });
