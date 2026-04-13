@@ -41,9 +41,9 @@ function ReservationPanel({ selectedDate, reservations, onCancelSuccess }: Reser
     setCancelError(null);
     try {
       const token = localStorage.getItem(ADMIN_TOKEN_KEY);
-      await axios.patch(
-        `${import.meta.env.VITE_API_BASE_URL}/api/v1/admin/reservations/${id}/`,
-        { status: 'cancelled' },
+      await axios.post(
+        `${import.meta.env.VITE_API_BASE_URL}/api/v1/admin/reservations/${id}/cancel/`,
+        { admin_note: '' },
         { headers: { Authorization: `Token ${token}` } }
       );
       onCancelSuccess();

@@ -28,7 +28,7 @@ export function useOccupiedSlots(
     setIsLoading(true);
     setError(null);
 
-    fetch(`/api/v1/spaces/${spaceId}/reservations/?date=${encodeURIComponent(date)}`, {
+    fetch(`${import.meta.env.VITE_API_BASE_URL}/api/v1/spaces/${spaceId}/reservations/?date=${encodeURIComponent(date)}`, {
       signal: controller.signal,
     })
       .then((res) => {
