@@ -10,8 +10,10 @@ venv/
 .venv/
 *.egg-info/
 
+
 # Node
 node_modules/
+apps/web/package-lock.json
 
 # 빌드 결과물
 dist/
@@ -31,3 +33,8 @@ Thumbs.db
 
 # 기타
 docs.zip
+docs/agent-handoff/
+
+docs/260328_회의록.md
+docs/장소사용신청서.jpg
+
