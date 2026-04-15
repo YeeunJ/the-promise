@@ -8,6 +8,7 @@
     "dev:api:win": "powershell -NoProfile -Command \"& .\\apps\\api\\.venv\\Scripts\\python.exe .\\apps\\api\\manage.py runserver\"",
     "dev:web": "pnpm --filter web dev",
     "dev:local": "pnpm dev:infra && concurrently \"pnpm dev:api\" \"pnpm dev:web\"",
+    "dev:local:win": "pnpm dev:infra && concurrently \"pnpm dev:api:win\" \"pnpm dev:web\"",
     "build:frontend": "pnpm --filter web build",
     "lint": "pnpm --filter web lint"
   },
