@@ -434,6 +434,80 @@ class SpaceReservationListView(APIView):
         return Response(serializer.data)
 
 
+class ReservationPublicCancelView(APIView):
+    @extend_schema(
+        request=inline_serializer(
+            name="PublicCancelRequest",
+            fields={
+                "name":  serializers.CharField(),
+                "phone": serializers.CharField(),
+            },
+        ),
+        responses={
+            200: ReservationSerializer,
+            400: OpenApiResponse(
+                response=inline_serializer("PublicCancelErrorResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description=(
+                    "취소 불가 상태 오류\n\n"
+                    "- name/phone 파라미터 누락 — `validation_error`\n"
+                    "- 이미 취소된 예약 — `already_cancelled`\n"
+                    "- 거절된 예약 — `cannot_cancel_rejected`"
+                ),
+            ),
+            403: OpenApiResponse(
+                response=inline_serializer("PublicCancelForbiddenResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="name/phone 불일치 — `forbidden`",
+            ),
+            404: OpenApiResponse(
+                response=inline_serializer("PublicCancelNotFoundResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="예약 없음 또는 삭제된 예약 — `not_found`",
+            ),
+        },
+    )
+    def post(self, request, pk):
+        name  = request.data.get("name")
+        phone = request.data.get("phone")
+        if not name or not phone:
+            return Response(
+                {"error": "validation_error", "message": "name과 phone이 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+        except Reservation.DoesNotExist:
+            return Response(
+                {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if reservation.applicant_name != name or reservation.applicant_phone != phone:
+            return Response(
+                {"error": "forbidden", "message": "예약 정보가 일치하지 않습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        if reservation.status == Reservation.Status.CANCELLED:
+            return Response(
+                {"error": "already_cancelled", "message": "이미 취소된 예약입니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if reservation.status == Reservation.Status.REJECTED:
+            return Response(
+                {"error": "cannot_cancel_rejected", "message": "거절된 예약은 취소할 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reservation.status = Reservation.Status.CANCELLED
+        reservation.save()
+        return Response(ReservationSerializer(reservation).data)
+
+
 class AdminReservationCancelView(APIView):
     permission_classes = [IsAuthenticated]
 
