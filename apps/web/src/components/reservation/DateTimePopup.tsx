@@ -4,7 +4,7 @@ import 'react-day-picker/style.css';
 import type { TimeSlotValue } from '../../types';
 import StepPopup from './StepPopup';
 import type { CompletedStep } from '../../utils/buildCompletedSteps';
-import { generateTimeSlots, formatTime, extractTimeHHMM, DEFAULT_START_TIME, DEFAULT_END_TIME } from '../../utils/formatDatetime';
+import { generateTimeSlots, formatTime, formatTimeSlotLabel, extractTimeHHMM, DEFAULT_START_TIME, DEFAULT_END_TIME, getKSTDateString } from '../../utils/formatDatetime';
 import { useOccupiedSlots } from '../../hooks/useOccupiedSlots';
 import { isSlotOccupied, hasOccupiedBetween } from '../../utils/occupiedSlotHelpers';
 
@@ -29,16 +29,13 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
 
   const { occupiedSlots, isLoading: isLoadingSlots, error: slotsError } = useOccupiedSlots(spaceId, localValue.date);
 
-  const occupiedSet = useMemo(
-    () => new Set(occupiedSlots.map(({ start_datetime }) => new Date(start_datetime).getTime())),
-    [occupiedSlots],
-  );
+  const todayStr = useMemo(() => getKSTDateString(), []);
 
+  // DayPicker disabled 기준을 KST 날짜 자정으로 설정 (todayStr과 일관성 유지)
   const today = useMemo(() => {
-    const d = new Date();
-    d.setHours(0, 0, 0, 0);
-    return d;
-  }, []);
+    const [y, m, d] = todayStr.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }, [todayStr]);
 
   useEffect(() => {
     if (isOpen) {
@@ -104,14 +101,23 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
     }
   }
 
-  function isOccupied(slot: string): boolean {
-    return occupiedSet.has(new Date(slot).getTime());
+  function isPast(slot: string): boolean {
+    // 오늘 날짜의 슬롯만 과거 여부 확인 (미래 날짜는 항상 선택 가능)
+    if (localValue.date !== todayStr) return false;
+    return new Date(slot).getTime() <= Date.now();
+  }
+
+  function isMidnightNextDay(slot: string): boolean {
+    return slot.slice(0, 10) !== localValue.date && slot.slice(11, 16) === '00:00';
   }
 
   function getSlotStyle(slot: string): string {
     const base = 'px-2 py-1 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/20';
-    if (isOccupied(slot)) {
+    if (isSlotOccupied(slot, occupiedSlots)) {
       return `${base} bg-gray-200 text-gray-400 border-gray-200 line-through cursor-not-allowed`;
+    }
+    if (isPast(slot)) {
+      return `${base} bg-gray-50 text-gray-300 border-gray-200 cursor-not-allowed`;
     }
     if (isSlotDisabled(slot)) {
       return `${base} bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed`;
@@ -129,7 +135,10 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
   }
 
   function isSlotDisabled(slot: string): boolean {
-    if (isOccupied(slot)) return true;
+    if (isSlotOccupied(slot, occupiedSlots)) return true;
+    if (isPast(slot)) return true;
+    // 24:00 슬롯은 종료 시간으로만 선택 가능 (시작 시간 선택 단계에서는 비활성화)
+    if (isMidnightNextDay(slot) && (!localValue.startTime || Boolean(localValue.endTime))) return true;
     return Boolean(localValue.startTime && !localValue.endTime && slot < localValue.startTime);
   }
 
@@ -201,7 +210,7 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
               {!localValue.startTime && '시작 시간을 선택해주세요'}
               {localValue.startTime && !localValue.endTime && '종료 시간을 선택해주세요'}
               {localValue.startTime && localValue.endTime && (
-                <>{formatTime(localValue.startTime)} ~ {formatTime(localValue.endTime)}</>
+                <>{formatTime(localValue.startTime)} ~ {formatTimeSlotLabel(localValue.endTime, localValue.date)}</>
               )}
             </p>
             <div className="ml-auto flex items-center gap-2">
@@ -245,7 +254,7 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
                       onClick={() => handleSlotClick(slot)}
                       className={getSlotStyle(slot)}
                     >
-                      {formatTime(slot)}
+                      {formatTimeSlotLabel(slot, localValue.date)}
                     </button>
                   ))}
                 </div>

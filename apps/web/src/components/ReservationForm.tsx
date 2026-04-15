@@ -4,7 +4,7 @@ import type { Reservation, ReservationFormData, TimeSlotValue, ApiError } from '
 import { INITIAL_TIME_SLOT } from '../utils/reservationFormHelpers';
 import { buildCompletedSteps } from '../utils/buildCompletedSteps';
 import type { CompletedStep } from '../utils/buildCompletedSteps';
-import { formatTime } from '../utils/formatDatetime';
+import { formatTime, formatTimeSlotLabel } from '../utils/formatDatetime';
 import ApplicantPopup from './reservation/ApplicantPopup';
 import type { ApplicantData } from './reservation/ApplicantPopup';
 import SpacePopup from './reservation/SpacePopup';
@@ -51,6 +51,15 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
     if (activePopup === null) return;
     const idx = POPUP_SEQUENCE.indexOf(activePopup);
     setActivePopup(idx > 0 ? POPUP_SEQUENCE[idx - 1] : null);
+  }
+
+  function resolveEditTarget(errorMessage: string | null): Exclude<ActivePopup, null> {
+    if (!errorMessage) return 'applicant';
+    if (errorMessage.includes('과거') || errorMessage.includes('시간') || errorMessage.includes('날짜')) return 'datetime';
+    if (errorMessage.includes('공간') || errorMessage.includes('장소')) return 'space';
+    if (errorMessage.includes('인원')) return 'headcount';
+    if (errorMessage.includes('목적')) return 'purpose';
+    return 'applicant';
   }
 
   function startFlow() {
@@ -165,7 +174,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
                   purpose={purpose}
                   submitError={submitError}
                   isSubmitting={isSubmitting}
-                  onEdit={() => { setIsReviewing(false); setActivePopup('applicant'); }}
+                  onEdit={() => { setIsReviewing(false); setActivePopup(resolveEditTarget(submitError)); }}
                   onSubmit={() => void handleSubmit(purpose)}
                 />
               </div>
@@ -249,7 +258,7 @@ function ReviewPanel({
   onSubmit,
 }: ReviewPanelProps): JSX.Element {
   const spaceLabel = `${spaceSelection.buildingName}${spaceSelection.floor !== null ? ` ${spaceSelection.floor}층` : ''} ${spaceSelection.spaceName}`;
-  const datetimeLabel = `${timeSlot.date} ${formatTime(timeSlot.startTime)} ~ ${formatTime(timeSlot.endTime)}`;
+  const datetimeLabel = `${timeSlot.date} ${formatTime(timeSlot.startTime)} ~ ${formatTimeSlotLabel(timeSlot.endTime, timeSlot.date)}`;
 
   return (
     <div className="rounded-2xl border border-gray-200 bg-white shadow-md overflow-hidden">
@@ -277,7 +286,11 @@ function ReviewPanel({
         <button
           type="button"
           onClick={onEdit}
-          className="flex-1 rounded-xl border border-gray-300 bg-white px-4 py-3 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className={`flex-1 rounded-xl border px-4 py-3 text-sm font-medium transition-colors ${
+            submitError
+              ? 'border-brand-primary bg-brand-primary text-white hover:bg-brand-primary/90'
+              : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+          }`}
         >
           수정하기
         </button>

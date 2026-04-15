@@ -3,7 +3,7 @@ const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 기본 시간 표시 범위 (HH:MM) */
 export const DEFAULT_START_TIME = '07:00';
-export const DEFAULT_END_TIME = '22:00';
+export const DEFAULT_END_TIME = '23:30';
 
 /**
  * ISO 8601 문자열을 Date 객체로 파싱
@@ -49,8 +49,8 @@ export function formatDatetimeRange(start: string, end: string): string {
 
 /**
  * 날짜 문자열("YYYY-MM-DD")을 받아 00:00 ~ 23:30, 30분 단위 ISO 8601 배열 반환 (KST +09:00)
- * 예: ["2026-04-10T00:00:00+09:00", "2026-04-10T00:30:00+09:00", ...]
- * 총 48개 슬롯 반환
+ * 마지막 49번째 슬롯은 익일 00:00 (24:00 종료 슬롯)
+ * 총 49개 슬롯 반환
  */
 export function generateTimeSlots(date: string): string[] {
   const slots: string[] = [];
@@ -60,7 +60,23 @@ export function generateTimeSlots(date: string): string[] {
     const minutes = String(totalMinutes % 60).padStart(2, '0');
     slots.push(`${date}T${hours}:${minutes}:00+09:00`);
   }
+  // 49번째: 익일 00:00 = "24:00" 표기용 종료 슬롯
+  const [year, month, day] = date.split('-').map(Number);
+  const nextDay = new Date(year, month - 1, day + 1);
+  const ny = nextDay.getFullYear();
+  const nm = String(nextDay.getMonth() + 1).padStart(2, '0');
+  const nd = String(nextDay.getDate()).padStart(2, '0');
+  slots.push(`${ny}-${nm}-${nd}T00:00:00+09:00`);
   return slots;
+}
+
+/**
+ * 슬롯 ISO 문자열을 버튼 표시용 레이블로 변환
+ * 익일 00:00 슬롯(baseDate와 날짜가 다른 00:00)은 "24:00"으로 표기
+ */
+export function formatTimeSlotLabel(slot: string, baseDate: string): string {
+  if (slot.slice(0, 10) !== baseDate && slot.slice(11, 16) === '00:00') return '24:00';
+  return formatTime(slot);
 }
 
 /**

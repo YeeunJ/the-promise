@@ -98,9 +98,9 @@ describe('formatDatetimeRange', () => {
 });
 
 describe('generateTimeSlots', () => {
-  it('날짜 문자열로 48개의 ISO 8601 슬롯 배열을 반환한다 (happy path)', () => {
+  it('날짜 문자열로 49개의 ISO 8601 슬롯 배열을 반환한다 (happy path, 마지막은 24:00 다음날 자정)', () => {
     const slots = generateTimeSlots('2026-04-10');
-    expect(slots).toHaveLength(48);
+    expect(slots).toHaveLength(49);
   });
 
   it('첫 번째 슬롯이 00:00이고 마지막 슬롯이 23:30이다 (boundary case)', () => {
@@ -121,10 +121,11 @@ describe('generateTimeSlots', () => {
     expect(slots.every((s) => s.endsWith('+09:00'))).toBe(true);
   });
 
-  it('모든 슬롯이 지정된 날짜로 시작한다', () => {
+  it('첫 48개 슬롯이 지정된 날짜로 시작하고, 마지막 슬롯은 다음날 자정이다', () => {
     const date = '2026-12-31';
     const slots = generateTimeSlots(date);
-    expect(slots.every((s) => s.startsWith(date))).toBe(true);
+    expect(slots.slice(0, 48).every((s) => s.startsWith(date))).toBe(true);
+    expect(slots[48]).toBe('2027-01-01T00:00:00+09:00');
   });
 
   it('시간과 분이 두 자리로 패딩된다 (boundary case)', () => {
