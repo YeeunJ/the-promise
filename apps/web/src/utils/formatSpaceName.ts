@@ -8,3 +8,14 @@ export function formatSpaceName(space: Reservation['space']): string {
   const floorPart = space.floor !== null ? `${space.floor}층 ` : '';
   return `${space.building.name} ${floorPart}${space.name}`;
 }
+
+export function formatSpaceNameParts(space: Reservation['space']): {
+  buildingFloor: string;
+  roomName: string;
+} {
+  const buildingFloor =
+    space.floor !== null
+      ? `${space.building.name} ${space.floor}층`
+      : space.building.name;
+  return { buildingFloor, roomName: space.name };
+}
