@@ -1,0 +1,122 @@
+[
+  {
+    "model": "reservations.department",
+    "pk": 1,
+    "fields": {
+      "name": "1교구",
+      "display_order": 1,
+      "pastor_id": 1,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 2,
+    "fields": {
+      "name": "2교구",
+      "display_order": 2,
+      "pastor_id": 2,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 3,
+    "fields": {
+      "name": "3교구",
+      "display_order": 3,
+      "pastor_id": 3,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 4,
+    "fields": {
+      "name": "4교구",
+      "display_order": 4,
+      "pastor_id": 4,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 5,
+    "fields": {
+      "name": "5교구",
+      "display_order": 5,
+      "pastor_id": 5,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 6,
+    "fields": {
+      "name": "6교구",
+      "display_order": 6,
+      "pastor_id": 6,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 7,
+    "fields": {
+      "name": "청년부",
+      "display_order": 7,
+      "pastor_id": null,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 8,
+    "fields": {
+      "name": "교회학교",
+      "display_order": 8,
+      "pastor_id": null,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 9,
+    "fields": {
+      "name": "어와나",
+      "display_order": 9,
+      "pastor_id": null,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  },
+  {
+    "model": "reservations.department",
+    "pk": 10,
+    "fields": {
+      "name": "기타",
+      "display_order": 10,
+      "pastor_id": null,
+      "is_active": true,
+      "created_at": "2026-04-17T00:00:00+09:00",
+      "updated_at": "2026-04-17T00:00:00+09:00"
+    }
+  }
+]
