@@ -11,7 +11,8 @@ const VALID_FORM: ReservationFormData = {
   space: 1,
   applicant_name: '홍길동',
   applicant_phone: '010-1234-5678',
-  applicant_team: '청년부',
+  team: null,
+  custom_team_name: '청년부',
   leader_phone: '010-8765-4321',
   headcount: 10,
   purpose: '정기모임',
@@ -49,7 +50,8 @@ describe('INITIAL_FORM_DATA', () => {
   it('모든 문자열 필드가 빈 문자열이다', () => {
     expect(INITIAL_FORM_DATA.applicant_name).toBe('');
     expect(INITIAL_FORM_DATA.applicant_phone).toBe('');
-    expect(INITIAL_FORM_DATA.applicant_team).toBe('');
+    expect(INITIAL_FORM_DATA.team).toBeNull();
+    expect(INITIAL_FORM_DATA.custom_team_name).toBeNull();
     expect(INITIAL_FORM_DATA.leader_phone).toBe('');
     expect(INITIAL_FORM_DATA.purpose).toBe('');
     expect(INITIAL_FORM_DATA.start_datetime).toBe('');
@@ -91,9 +93,9 @@ describe('validateReservationForm', () => {
     expect(errors.applicant_phone).toBe('010-XXXX-XXXX 형식으로 입력해주세요');
   });
 
-  it('applicant_team이 빈 문자열이면 에러를 반환한다', () => {
-    const errors = validateReservationForm({ ...VALID_FORM, applicant_team: '' });
-    expect(errors.applicant_team).toBe('단체명을 입력해주세요');
+  it('team과 custom_team_name이 모두 없으면 에러를 반환한다', () => {
+    const errors = validateReservationForm({ ...VALID_FORM, team: null, custom_team_name: null });
+    expect(errors.team).toBe('단체를 선택하거나 입력해주세요');
   });
 
   it('leader_phone이 빈 문자열이면 에러를 반환한다', () => {
@@ -136,7 +138,7 @@ describe('validateReservationForm', () => {
     expect(Object.keys(errors).length).toBeGreaterThan(0);
     expect(errors.applicant_name).toBeDefined();
     expect(errors.applicant_phone).toBeDefined();
-    expect(errors.applicant_team).toBeDefined();
+    expect(errors.team).toBeDefined();
     expect(errors.leader_phone).toBeDefined();
     expect(errors.space).toBeDefined();
     expect(errors.headcount).toBeDefined();

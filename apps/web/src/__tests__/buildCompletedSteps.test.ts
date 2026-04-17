@@ -8,11 +8,12 @@ describe('buildCompletedSteps', () => {
   const mockApplicant: ApplicantData = {
     name: '홍길동',
     phone: '010-1234-5678',
-    departmentId: 'youth',
+    departmentId: 1,
     departmentName: '청년부',
-    teamId: 'youth-1',
+    teamId: 1,
     teamName: '1청년부',
     pastorDisplay: '김요셉 전도사',
+    customTeamName: null,
   };
 
   const mockSpace: SpaceSelection = {
