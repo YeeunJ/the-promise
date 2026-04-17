@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Building, Reservation, Space, Team
+from .models import Building, Department, Pastor, Reservation, Space, Team
 
 
 class BaseTestCase(TestCase):
@@ -31,6 +31,14 @@ class BaseTestCase(TestCase):
             is_active=False,
         )
 
+        # 부서/팀 기본 픽스처
+        self.base_dept = Department.objects.create(name="청년부", display_order=7)
+        self.base_team = Team.objects.create(
+            name="디모데(1청년부)",
+            department=self.base_dept,
+            leader_phone="01098765432",
+        )
+
         self.admin = User.objects.create_superuser(username="admin", password="admin1234")
         self.token = Token.objects.create(user=self.admin)
 
@@ -50,7 +58,7 @@ class BaseTestCase(TestCase):
             space=space or self.space,
             applicant_name="홍길동",
             applicant_phone="01012345678",
-            applicant_team="청년부",
+            team=self.base_team,
             leader_phone="01098765432",
             headcount=10,
             purpose="팀 모임",
@@ -163,7 +171,7 @@ class ReservationCreateTest(BaseTestCase):
             "space": self.space.pk,
             "applicant_name": "홍길동",
             "applicant_phone": "01012345678",
-            "applicant_team": "청년부",
+            "team": self.base_team.pk,
             "leader_phone": "01098765432",
             "headcount": 10,
             "purpose": "팀 모임",
@@ -457,7 +465,8 @@ class TeamListViewTest(BaseTestCase):
         Team.objects.create(name="찬양팀", leader_phone="01098765432", is_active=True)
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
+        # base_team(setUp) + 2 newly created = 3
+        self.assertEqual(len(response.data), 3)
 
     def test_inactive_team_excluded(self):
         Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
@@ -467,12 +476,14 @@ class TeamListViewTest(BaseTestCase):
         self.assertNotIn("비활성팀", names)
 
     def test_returns_empty_when_no_teams(self):
+        Team.objects.all().delete()
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data, [])
 
     def test_response_includes_leader_phone(self):
-        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
+        Team.objects.all().delete()
+        team = Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
         response = self.client.get("/api/v1/teams/")
         self.assertIn("leader_phone", response.data[0])
         self.assertEqual(response.data[0]["leader_phone"], "01012345678")
@@ -729,3 +740,345 @@ class ReservationTicketViewTest(BaseTestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.json()["error"], "not_found")
+
+
+# ─── Phase 1-2: 부서/교역자 모델 테스트 ──────────────────────────────────────
+
+
+class PastorModelTest(TestCase):
+    """Pastor 모델 CRUD 및 제약조건"""
+
+    def test_create_pastor(self):
+        pastor = Pastor.objects.create(
+            name="이상윤",
+            title="목사",
+            phone="010-1234-5678",
+        )
+        self.assertEqual(pastor.name, "이상윤")
+        self.assertEqual(pastor.title, "목사")
+        self.assertTrue(pastor.is_active)
+        self.assertIsNotNone(pastor.created_at)
+        self.assertIsNotNone(pastor.updated_at)
+
+    def test_str_representation(self):
+        pastor = Pastor.objects.create(name="정원", title="목사", phone="010-0000-0000")
+        self.assertEqual(str(pastor), "정원 목사")
+
+    def test_default_is_active_true(self):
+        pastor = Pastor.objects.create(name="한혜경", title="전도사", phone="010-0000-0000")
+        self.assertTrue(pastor.is_active)
+
+    def test_db_table_name(self):
+        self.assertEqual(Pastor._meta.db_table, "pastors")
+
+
+class DepartmentModelTest(TestCase):
+    """Department 모델 CRUD 및 제약조건"""
+
+    def test_create_department_without_pastor(self):
+        dept = Department.objects.create(
+            name="기타",
+            display_order=10,
+        )
+        self.assertEqual(dept.name, "기타")
+        self.assertEqual(dept.display_order, 10)
+        self.assertIsNone(dept.pastor)
+        self.assertTrue(dept.is_active)
+
+    def test_create_department_with_pastor(self):
+        pastor = Pastor.objects.create(name="이상윤", title="목사", phone="010-0000-0000")
+        dept = Department.objects.create(
+            name="1교구",
+            display_order=1,
+            pastor=pastor,
+        )
+        self.assertEqual(dept.pastor, pastor)
+        self.assertEqual(dept.name, "1교구")
+
+    def test_str_representation(self):
+        dept = Department.objects.create(name="청년부", display_order=7)
+        self.assertEqual(str(dept), "청년부")
+
+    def test_ordering_by_display_order(self):
+        Department.objects.create(name="기타", display_order=10)
+        Department.objects.create(name="1교구", display_order=1)
+        Department.objects.create(name="청년부", display_order=7)
+        names = list(Department.objects.values_list("name", flat=True))
+        self.assertEqual(names, ["1교구", "청년부", "기타"])
+
+    def test_pastor_set_null_on_delete(self):
+        pastor = Pastor.objects.create(name="정원", title="목사", phone="010-0000-0000")
+        dept = Department.objects.create(name="2교구", display_order=2, pastor=pastor)
+        pastor.delete()
+        dept.refresh_from_db()
+        self.assertIsNone(dept.pastor)
+
+    def test_db_table_name(self):
+        self.assertEqual(Department._meta.db_table, "departments")
+
+
+class TeamModelModificationTest(TestCase):
+    """Team 모델 수정 — department FK, pastor FK, unique_together"""
+
+    def setUp(self):
+        self.pastor = Pastor.objects.create(name="이상윤", title="목사", phone="010-0000-0000")
+        self.dept = Department.objects.create(name="1교구", display_order=1, pastor=self.pastor)
+
+    def test_create_team_with_department(self):
+        team = Team.objects.create(
+            name="대림1",
+            department=self.dept,
+            leader_phone="010-0000-0000",
+        )
+        self.assertEqual(team.department, self.dept)
+        self.assertIsNone(team.pastor)
+
+    def test_create_team_with_own_pastor(self):
+        team_pastor = Pastor.objects.create(name="전희철", title="목사", phone="010-1111-1111")
+        dept = Department.objects.create(name="청년부", display_order=7)
+        team = Team.objects.create(
+            name="디모데(1청년부)",
+            department=dept,
+            pastor=team_pastor,
+            leader_phone="010-0000-0000",
+        )
+        self.assertEqual(team.pastor, team_pastor)
+
+    def test_unique_together_department_name(self):
+        Team.objects.create(name="1구역", department=self.dept, leader_phone="010-0000-0000")
+        with self.assertRaises(Exception):
+            Team.objects.create(name="1구역", department=self.dept, leader_phone="010-1111-1111")
+
+    def test_same_name_different_department_allowed(self):
+        dept2 = Department.objects.create(name="2교구", display_order=2)
+        Team.objects.create(name="관리", department=self.dept, leader_phone="010-0000-0000")
+        team2 = Team.objects.create(name="관리", department=dept2, leader_phone="010-1111-1111")
+        self.assertEqual(team2.name, "관리")
+
+    def test_department_protect_on_delete(self):
+        Team.objects.create(name="대림1", department=self.dept, leader_phone="010-0000-0000")
+        with self.assertRaises(Exception):
+            self.dept.delete()
+
+    def test_pastor_set_null_on_delete(self):
+        team_pastor = Pastor.objects.create(name="전희철", title="목사", phone="010-1111-1111")
+        team = Team.objects.create(
+            name="디모데",
+            department=self.dept,
+            pastor=team_pastor,
+            leader_phone="010-0000-0000",
+        )
+        team_pastor.delete()
+        team.refresh_from_db()
+        self.assertIsNone(team.pastor)
+
+    def test_pastor_display_inherits_from_department(self):
+        team = Team.objects.create(
+            name="대림1",
+            department=self.dept,
+            leader_phone="010-0000-0000",
+        )
+        self.assertEqual(team.get_pastor_display(), "이상윤 목사")
+
+    def test_pastor_display_uses_own_pastor(self):
+        team_pastor = Pastor.objects.create(name="전희철", title="목사", phone="010-1111-1111")
+        team = Team.objects.create(
+            name="디모데",
+            department=self.dept,
+            pastor=team_pastor,
+            leader_phone="010-0000-0000",
+        )
+        self.assertEqual(team.get_pastor_display(), "전희철 목사")
+
+    def test_pastor_display_none_when_no_pastor(self):
+        dept = Department.objects.create(name="기타", display_order=10)
+        team = Team.objects.create(name="기타팀", department=dept, leader_phone="010-0000-0000")
+        self.assertIsNone(team.get_pastor_display())
+
+
+class ReservationModelModificationTest(BaseTestCase):
+    """Reservation 모델 수정 — team FK, custom_team_name"""
+
+    def setUp(self):
+        super().setUp()
+        self.pastor = Pastor.objects.create(name="이상윤", title="목사", phone="010-0000-0000")
+        self.dept = Department.objects.create(name="1교구", display_order=1, pastor=self.pastor)
+        self.team = Team.objects.create(
+            name="대림1",
+            department=self.dept,
+            leader_phone="010-0000-0000",
+        )
+
+    def test_create_reservation_with_team_fk(self):
+        r = Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=self.team,
+            leader_phone="01098765432",
+            headcount=10,
+            purpose="팀 모임",
+            start_datetime=self._make_dt(10),
+            end_datetime=self._make_dt(12),
+        )
+        self.assertEqual(r.team, self.team)
+        self.assertEqual(r.custom_team_name, "")
+
+    def test_create_reservation_with_custom_team_name(self):
+        r = Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=None,
+            custom_team_name="외부 방문 팀",
+            leader_phone="01098765432",
+            headcount=10,
+            purpose="외부 행사",
+            start_datetime=self._make_dt(14),
+            end_datetime=self._make_dt(16),
+        )
+        self.assertIsNone(r.team)
+        self.assertEqual(r.custom_team_name, "외부 방문 팀")
+
+    def test_team_set_null_on_delete(self):
+        r = Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=self.team,
+            leader_phone="01098765432",
+            headcount=10,
+            purpose="팀 모임",
+            start_datetime=self._make_dt(10),
+            end_datetime=self._make_dt(12),
+        )
+        self.team.delete()
+        r.refresh_from_db()
+        self.assertIsNone(r.team)
+
+    def test_applicant_team_field_removed(self):
+        field_names = [f.name for f in Reservation._meta.get_fields()]
+        self.assertNotIn("applicant_team", field_names)
+
+
+# ─── Phase 3-4: 부서/팀/목사 재구조화 API 테스트 ─────────────────────────────
+
+class DepartmentListViewTest(BaseTestCase):
+    """GET /api/v1/departments/ — 부서>팀>목사 중첩 응답"""
+
+    def setUp(self):
+        super().setUp()
+        self.pastor_dept = Pastor.objects.create(
+            name="김부서", title="목사", phone="01000000001"
+        )
+        self.pastor_team = Pastor.objects.create(
+            name="이팀", title="전도사", phone="01000000002"
+        )
+        self.base_dept.pastor = self.pastor_dept
+        self.base_dept.save()
+        self.base_team.pastor = self.pastor_team
+        self.base_team.save()
+
+    def test_returns_200(self):
+        response = self.client.get("/api/v1/departments/")
+        self.assertEqual(response.status_code, 200)
+
+    def test_returns_nested_department_team_pastor(self):
+        response = self.client.get("/api/v1/departments/")
+        dept = next(d for d in response.data if d["id"] == self.base_dept.pk)
+        self.assertEqual(dept["name"], "청년부")
+        self.assertEqual(dept["pastor"]["name"], "김부서")
+        self.assertEqual(dept["pastor"]["title"], "목사")
+        team_names = [t["name"] for t in dept["teams"]]
+        self.assertIn("디모데(1청년부)", team_names)
+
+    def test_team_pastor_display_uses_team_pastor(self):
+        response = self.client.get("/api/v1/departments/")
+        dept = next(d for d in response.data if d["id"] == self.base_dept.pk)
+        team = next(t for t in dept["teams"] if t["id"] == self.base_team.pk)
+        self.assertEqual(team["pastor_display"], "이팀 전도사")
+
+    def test_departments_ordered_by_display_order(self):
+        Department.objects.create(name="유아부", display_order=1)
+        Department.objects.create(name="장년부", display_order=99)
+        response = self.client.get("/api/v1/departments/")
+        orders = [d["display_order"] for d in response.data]
+        self.assertEqual(orders, sorted(orders))
+
+
+class PastorDisplayInheritanceSerializerTest(BaseTestCase):
+    """팀에 목사가 없으면 부서 목사로 폴백"""
+
+    def setUp(self):
+        super().setUp()
+        self.dept_pastor = Pastor.objects.create(
+            name="박부장", title="목사", phone="01011112222"
+        )
+        self.base_dept.pastor = self.dept_pastor
+        self.base_dept.save()
+        # base_team.pastor 는 None 상태 유지
+
+    def test_team_pastor_null_falls_back_to_department_pastor(self):
+        response = self.client.get("/api/v1/departments/")
+        dept = next(d for d in response.data if d["id"] == self.base_dept.pk)
+        team = next(t for t in dept["teams"] if t["id"] == self.base_team.pk)
+        self.assertEqual(team["pastor_display"], "박부장 목사")
+
+    def test_both_null_returns_none(self):
+        self.base_dept.pastor = None
+        self.base_dept.save()
+        response = self.client.get("/api/v1/departments/")
+        dept = next(d for d in response.data if d["id"] == self.base_dept.pk)
+        team = next(t for t in dept["teams"] if t["id"] == self.base_team.pk)
+        self.assertIsNone(team["pastor_display"])
+
+
+class ReservationSerializerBackwardCompatTest(BaseTestCase):
+    """ReservationSerializer 에 applicant_team 문자열 포함 (하위 호환)"""
+
+    def test_applicant_team_equals_team_name_when_team_set(self):
+        r = self._make_reservation()
+        response = self.client.get(f"/api/v1/reservations/{r.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("applicant_team", response.data)
+        self.assertEqual(response.data["applicant_team"], self.base_team.name)
+
+    def test_applicant_team_equals_custom_team_name_when_team_null(self):
+        r = self._make_reservation(team=None, custom_team_name="외부손님")
+        response = self.client.get(f"/api/v1/reservations/{r.pk}/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["applicant_team"], "외부손님")
+
+
+class ReservationCreateEtcCaseTest(BaseTestCase):
+    """'기타' 케이스: team=null + custom_team_name 으로 예약 생성"""
+
+    def _etc_payload(self):
+        return {
+            "space": self.space.pk,
+            "applicant_name": "외부인",
+            "applicant_phone": "01011112222",
+            "team": None,
+            "custom_team_name": "외부손님",
+            "leader_phone": "01033334444",
+            "headcount": 5,
+            "purpose": "방문 모임",
+            "start_datetime": self._make_dt(10).isoformat(),
+            "end_datetime": self._make_dt(12).isoformat(),
+        }
+
+    def test_create_succeeds_with_custom_team_name(self):
+        response = self.client.post(
+            "/api/v1/reservations/", self._etc_payload(), format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+        r = Reservation.objects.get(pk=response.data["id"])
+        self.assertIsNone(r.team)
+        self.assertEqual(r.custom_team_name, "외부손님")
+
+    def test_response_includes_applicant_team_as_custom_name(self):
+        response = self.client.post(
+            "/api/v1/reservations/", self._etc_payload(), format="json"
+        )
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data.get("applicant_team"), "외부손님")
