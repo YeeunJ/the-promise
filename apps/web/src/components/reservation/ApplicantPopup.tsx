@@ -9,10 +9,11 @@ import type { DepartmentSelection } from './DepartmentSelector';
 export interface ApplicantData {
   name: string;
   phone: string;
-  departmentId: string;
+  departmentId: number;
   departmentName: string;
-  teamId: string;
+  teamId: number | null;
   teamName: string;
+  customTeamName: string | null;
   pastorDisplay: string;
 }
 
@@ -34,6 +35,7 @@ function toDepartmentSelection(data: ApplicantData): DepartmentSelection {
     departmentName: data.departmentName,
     teamId: data.teamId,
     teamName: data.teamName,
+    customTeamName: data.customTeamName,
     pastorDisplay: data.pastorDisplay,
   };
 }
@@ -96,7 +98,10 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
 
   // --- step: team ---
   function handleTeamConfirm() {
-    if (!department?.teamId) return;
+    if (!department) return;
+    const isEtc = department.departmentName === '기타';
+    if (!isEtc && !department.teamId) return;
+    if (isEtc && !department.customTeamName?.trim()) return;
     onConfirm({
       name: name.trim(),
       phone,
@@ -104,6 +109,7 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       departmentName: department.departmentName,
       teamId: department.teamId,
       teamName: department.teamName,
+      customTeamName: department.customTeamName,
       pastorDisplay: department.pastorDisplay,
     });
   }
@@ -146,7 +152,9 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       canConfirm={
         step === 'name' ? name.trim() !== ''
         : step === 'phone' ? phone.trim() !== ''
-        : Boolean(department?.teamId)
+        : department?.departmentName === '기타'
+          ? Boolean(department?.customTeamName?.trim())
+          : Boolean(department?.teamId)
       }
       confirmLabel="다음"
       completedSteps={[...(completedSteps ?? []), ...localCompletedSteps]}

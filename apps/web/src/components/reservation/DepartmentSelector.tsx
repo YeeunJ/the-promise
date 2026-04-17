@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { DEPARTMENTS, buildPastorDisplay } from '../../data/teams';
-import type { Department, Team } from '../../data/teams';
+import { useDepartments } from '../../hooks/useDepartments';
+import type { ApiDepartment, ApiTeam } from '../../types';
 
 export interface DepartmentSelection {
-  departmentId: string;
+  departmentId: number;
   departmentName: string;
-  teamId: string;
+  teamId: number | null;
   teamName: string;
+  customTeamName: string | null;
   pastorDisplay: string;
 }
 
@@ -16,66 +17,83 @@ interface DepartmentSelectorProps {
 }
 
 function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.Element {
-  const [selectedDept, setSelectedDept] = useState<Department | null>(
-    value ? (DEPARTMENTS.find((d) => d.id === value.departmentId) ?? null) : null,
-  );
-  const [directInput, setDirectInput] = useState<string>(
-    value?.departmentId === 'etc' ? value.teamName : '',
-  );
+  const { departments, isLoading, error } = useDepartments();
 
-  // 부모가 value를 null로 초기화할 때 내부 상태도 초기화 (선택 드리프트 방지)
+  const [selectedDept, setSelectedDept] = useState<ApiDepartment | null>(null);
+  const [directInput, setDirectInput] = useState<string>('');
+
   useEffect(() => {
     if (value === null) {
       setSelectedDept(null);
       setDirectInput('');
-    } else {
-      const dept = DEPARTMENTS.find((d) => d.id === value.departmentId);
-      setSelectedDept(dept ?? null);
-      if (value.departmentId === 'etc') {
-        setDirectInput(value.teamName);
-      }
+      return;
     }
-  }, [value]);
+    const dept = departments.find((d) => d.id === value.departmentId) ?? null;
+    setSelectedDept(dept);
+    if (dept?.name === '기타') {
+      setDirectInput(value.customTeamName ?? '');
+    }
+  }, [value, departments]);
 
-  function handleDeptClick(dept: Department) {
+  function handleDeptClick(dept: ApiDepartment) {
     setSelectedDept(dept);
     setDirectInput('');
     if (value?.departmentId !== dept.id) {
       onChange({
         departmentId: dept.id,
         departmentName: dept.name,
-        teamId: '',
+        teamId: null,
         teamName: '',
+        customTeamName: null,
         pastorDisplay: '',
       });
     }
   }
 
-  function handleTeamClick(team: Team) {
+  function handleTeamClick(team: ApiTeam) {
     if (!selectedDept) return;
     onChange({
       departmentId: selectedDept.id,
       departmentName: selectedDept.name,
       teamId: team.id,
       teamName: team.name,
-      pastorDisplay: buildPastorDisplay(team.pastor),
+      customTeamName: null,
+      pastorDisplay: team.pastor_display,
     });
   }
 
   function handleDirectInputChange(text: string) {
     setDirectInput(text);
+    if (!selectedDept) return;
     onChange({
-      departmentId: 'etc',
-      departmentName: '기타',
-      teamId: 'etc-direct',
+      departmentId: selectedDept.id,
+      departmentName: selectedDept.name,
+      teamId: null,
       teamName: text,
+      customTeamName: text,
       pastorDisplay: '',
     });
   }
 
-  const isEtcSelected = selectedDept?.id === 'etc';
+  const isEtcSelected = selectedDept?.name === '기타';
   const showTeams = selectedDept !== null && !isEtcSelected;
   const showPastor = Boolean(value?.teamId && value?.pastorDisplay && !isEtcSelected);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-8 text-sm text-gray-500">
+        부서 정보를 불러오는 중...
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-red-50 border border-red-200 px-4 py-3 text-sm text-red-600">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -83,7 +101,7 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
       <div>
         <p className="text-sm font-medium text-black mb-2">부서 선택</p>
         <div className="flex flex-wrap gap-2">
-          {DEPARTMENTS.map((dept) => (
+          {departments.map((dept) => (
             <button
               key={dept.id}
               type="button"

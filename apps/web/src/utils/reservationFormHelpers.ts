@@ -7,7 +7,8 @@ export const INITIAL_FORM_DATA: ReservationFormData = {
   space: 0,
   applicant_name: '',
   applicant_phone: '',
-  applicant_team: '',
+  team: null,
+  custom_team_name: null,
   leader_phone: '',
   headcount: 0,
   purpose: '',
@@ -36,8 +37,8 @@ export function validateReservationForm(
     nextErrors.applicant_phone = '010-XXXX-XXXX 형식으로 입력해주세요';
   }
 
-  if (!formData.applicant_team.trim()) {
-    nextErrors.applicant_team = '단체명을 입력해주세요';
+  if (formData.team === null && !formData.custom_team_name?.trim()) {
+    nextErrors.team = '단체를 선택하거나 입력해주세요';
   }
 
   if (!formData.leader_phone.trim()) {

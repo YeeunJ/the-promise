@@ -323,7 +323,7 @@ function ReservationList({
 
       {/* 데스크탑: 테이블 (md 이상) */}
       <div className="hidden md:block">
-        <table className="w-full table-fixed divide-y divide-gray-200">
+        <table className="w-full min-w-[900px] table-fixed divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[6%]">
