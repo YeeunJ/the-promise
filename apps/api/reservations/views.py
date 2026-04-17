@@ -11,9 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Building, Reservation, Space, Team
+from .models import Building, Department, Reservation, Space, Team
 from .serializers import (
     BuildingWithSpacesSerializer,
+    DepartmentSerializer,
     OverlappingSlotSerializer,
     ReservationCancelSerializer,
     ReservationCreateSerializer,
@@ -32,6 +33,18 @@ class TeamListView(APIView):
     def get(self, request):
         teams = Team.objects.filter(is_active=True)
         return Response(TeamSerializer(teams, many=True).data)
+
+
+class DepartmentListView(APIView):
+    @extend_schema(responses=DepartmentSerializer(many=True))
+    def get(self, request):
+        departments = (
+            Department.objects
+            .filter(is_active=True)
+            .select_related("pastor")
+            .prefetch_related("teams__pastor")
+        )
+        return Response(DepartmentSerializer(departments, many=True).data)
 
 
 class SpaceListView(APIView):

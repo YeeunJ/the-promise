@@ -1,13 +1,40 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Building, Space, Reservation, Team
+from .models import Building, Space, Reservation, Team, Department, Pastor
 
 
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model = Team
         fields = ["id", "name", "leader_phone"]
+
+
+class PastorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pastor
+        fields = ["id", "name", "title"]
+
+
+class TeamNestedSerializer(serializers.ModelSerializer):
+    pastor = PastorSerializer(read_only=True)
+    pastor_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Team
+        fields = ["id", "name", "pastor", "pastor_display"]
+
+    def get_pastor_display(self, obj: Team) -> str | None:
+        return obj.get_pastor_display()
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    pastor = PastorSerializer(read_only=True)
+    teams = TeamNestedSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Department
+        fields = ["id", "name", "display_order", "pastor", "teams"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -34,15 +61,20 @@ class BuildingWithSpacesSerializer(serializers.ModelSerializer):
 
 class ReservationSerializer(serializers.ModelSerializer):
     space = SpaceSerializer(read_only=True)
+    applicant_team = serializers.SerializerMethodField()
 
     class Meta:
         model = Reservation
         fields = [
             "id", "space", "applicant_name", "applicant_phone",
-            "applicant_team", "leader_phone", "headcount",
+            "team", "custom_team_name", "applicant_team",
+            "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
             "status", "admin_note", "created_at",
         ]
+
+    def get_applicant_team(self, obj) -> str:
+        return obj.team.name if obj.team else obj.custom_team_name
 
 
 class ReservationCreateSerializer(serializers.ModelSerializer):
@@ -50,7 +82,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         model = Reservation
         fields = [
             "space", "applicant_name", "applicant_phone",
-            "applicant_team", "leader_phone", "headcount",
+            "team", "custom_team_name", "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
         ]
 

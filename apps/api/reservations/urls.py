@@ -1,6 +1,7 @@
 from django.urls import path
 from .views import (
     TeamListView,
+    DepartmentListView,
     SpaceListView,
     SpaceAvailabilityView,
     SpaceReservationListView,
@@ -15,6 +16,7 @@ from .views import (
 
 urlpatterns = [
     path("teams/",                                     TeamListView.as_view()),
+    path("departments/",                               DepartmentListView.as_view()),
     path("spaces/",                                    SpaceListView.as_view()),
     path("spaces/availability/",                       SpaceAvailabilityView.as_view()),
     path("spaces/<int:pk>/reservations/",              SpaceReservationListView.as_view()),
