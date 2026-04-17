@@ -2,8 +2,58 @@ from django.db import models
 from django.utils import timezone
 
 
+class Pastor(models.Model):
+    name       = models.CharField(max_length=50)
+    title      = models.CharField(max_length=50)
+    phone      = models.CharField(max_length=20)
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "pastors"
+
+    def __str__(self):
+        return f"{self.name} {self.title}"
+
+
+class Department(models.Model):
+    name          = models.CharField(max_length=100)
+    display_order = models.IntegerField()
+    pastor        = models.ForeignKey(
+                        Pastor,
+                        on_delete=models.SET_NULL,
+                        null=True,
+                        blank=True,
+                        related_name="departments",
+                    )
+    is_active     = models.BooleanField(default=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "departments"
+        ordering = ["display_order"]
+
+    def __str__(self):
+        return self.name
+
+
 class Team(models.Model):
-    name         = models.CharField(max_length=100, unique=True)
+    name         = models.CharField(max_length=100)
+    department   = models.ForeignKey(
+                       Department,
+                       on_delete=models.PROTECT,
+                       related_name="teams",
+                       null=True,
+                   )
+    pastor       = models.ForeignKey(
+                       Pastor,
+                       on_delete=models.SET_NULL,
+                       null=True,
+                       blank=True,
+                       related_name="teams",
+                   )
     leader_phone = models.CharField(max_length=20)
     is_active    = models.BooleanField(default=True)
     created_at   = models.DateTimeField(auto_now_add=True)
@@ -11,9 +61,16 @@ class Team(models.Model):
 
     class Meta:
         db_table = "teams"
+        unique_together = [("department", "name")]
 
     def __str__(self):
         return self.name
+
+    def get_pastor_display(self) -> str | None:
+        pastor = self.pastor or (self.department.pastor if self.department_id else None)
+        if pastor:
+            return f"{pastor.name} {pastor.title}"
+        return None
 
 
 class Building(models.Model):
@@ -58,7 +115,14 @@ class Reservation(models.Model):
     space           = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="reservations")
     applicant_name  = models.CharField(max_length=50)
     applicant_phone = models.CharField(max_length=20)
-    applicant_team  = models.CharField(max_length=100)
+    team            = models.ForeignKey(
+                          Team,
+                          on_delete=models.SET_NULL,
+                          null=True,
+                          blank=True,
+                          related_name="reservations",
+                      )
+    custom_team_name = models.CharField(max_length=100, blank=True, default="")
     leader_phone    = models.CharField(max_length=20)
     headcount       = models.PositiveIntegerField()
     purpose         = models.TextField()
