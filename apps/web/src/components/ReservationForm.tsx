@@ -88,7 +88,8 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
       space: spaceSelection.id,
       applicant_name: applicant.name,
       applicant_phone: applicant.phone,
-      applicant_team: `${applicant.departmentName} > ${applicant.teamName}`,
+      team: applicant.teamId,
+      custom_team_name: applicant.customTeamName ?? '',
       leader_phone: applicant.pastorDisplay || '직접 문의',
       headcount,
       purpose: purposeVal.trim(),
@@ -269,7 +270,14 @@ function ReviewPanel({
 
       <div className="px-5 py-4 space-y-3">
         <ReviewRow label="신청자" value={`${applicant.name} (${applicant.phone})`} />
-        <ReviewRow label="단체" value={`${applicant.departmentName} > ${applicant.teamName}`} />
+        <ReviewRow
+          label="단체"
+          value={
+            applicant.teamId === null
+              ? `${applicant.departmentName} > ${applicant.customTeamName ?? ''}`
+              : `${applicant.departmentName} > ${applicant.teamName}`
+          }
+        />
         <ReviewRow label="장소" value={spaceLabel} />
         <ReviewRow label="인원" value={`${headcount}명`} />
         <ReviewRow label="일시" value={datetimeLabel} />
