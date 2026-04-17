@@ -25,6 +25,8 @@ export interface Reservation {
   applicant_name: string;
   applicant_phone: string;
   applicant_team: string;
+  team: ApiTeam | null;
+  custom_team_name: string | null;
   leader_phone: string;
   headcount: number;
   purpose: string;
@@ -39,12 +41,34 @@ export interface ReservationFormData {
   space: number;
   applicant_name: string;
   applicant_phone: string;
-  applicant_team: string;
+  team: number | null;
+  custom_team_name: string | null;
   leader_phone: string;
   headcount: number;
   purpose: string;
   start_datetime: string;
   end_datetime: string;
+}
+
+export interface ApiPastor {
+  id: number;
+  name: string;
+  title: string;
+}
+
+export interface ApiTeam {
+  id: number;
+  name: string;
+  pastor: ApiPastor | null;
+  pastor_display: string;
+}
+
+export interface ApiDepartment {
+  id: number;
+  name: string;
+  display_order: number;
+  pastor: ApiPastor | null;
+  teams: ApiTeam[];
 }
 
 export interface ApiError {
