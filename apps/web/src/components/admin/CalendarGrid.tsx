@@ -1,5 +1,6 @@
-import { Reservation, ReservationStatus } from '../../types/index';
+import { Reservation } from '../../types/index';
 import { extractDateStr, getKSTDateString } from '../../utils/formatDatetime';
+import { getBuildingColor } from '../../lib/adminConstants';
 
 interface CalendarGridProps {
   currentYear: number;
@@ -16,14 +17,7 @@ const DAY_HEADER_COLOR: Record<number, string> = {
   6: 'text-[#3B82F6]',
 };
 
-const CHIP_CLASS: Record<ReservationStatus, string> = {
-  confirmed: 'bg-brand-primary/10 border-l-[3px] border-brand-primary text-brand-primary hover:bg-brand-primary/20',
-  pending:   'bg-brand-secondary/10 border-l-[3px] border-brand-secondary text-brand-secondary hover:bg-brand-secondary/20',
-  rejected:  'bg-[#DC2626]/10 border-l-[3px] border-[#DC2626] text-[#DC2626] hover:bg-[#DC2626]/20',
-  cancelled: 'bg-gray-100 border-l-[3px] border-gray-400 text-gray-500 hover:bg-gray-200',
-};
-
-const CHIP_BASE = 'flex items-center px-2.5 py-1 rounded-md text-xs font-medium truncate transition-colors duration-150 cursor-pointer';
+const CHIP_BASE = 'flex items-center px-2.5 py-1 rounded-md text-xs font-medium truncate transition-colors duration-150 cursor-pointer border-l-[3px]';
 
 function buildCalendarDays(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -51,19 +45,20 @@ function renderChips(dayReservations: Reservation[]): JSX.Element {
 
   return (
     <>
-      {visible.map((r) => (
-        <span
-          key={r.id}
-          className={`${CHIP_BASE} ${CHIP_CLASS[r.status]} hidden sm:flex`}
-        >
-          {r.applicant_team} - {r.space.name}
-        </span>
-      ))}
-      {dayReservations.length > 0 && (
-        <span className="sm:hidden w-1.5 h-1.5 rounded-full bg-brand-primary mt-1" />
-      )}
+      {visible.map((r) => {
+        const color = getBuildingColor(r.space.building.name);
+        return (
+          <span
+            key={r.id}
+            className={CHIP_BASE}
+            style={{ backgroundColor: color.bg, borderLeftColor: color.main }}
+          >
+            {r.applicant_team} - {r.space.name}
+          </span>
+        );
+      })}
       {remaining > 0 && (
-        <span className="text-xs text-brand-accent font-medium pl-1 hidden sm:inline">
+        <span className="text-xs text-brand-accent font-medium pl-1">
           +{remaining} more
         </span>
       )}
@@ -103,7 +98,7 @@ function CalendarGrid({
             return (
               <div
                 key={`empty-${idx}`}
-                className="min-h-[145px] p-2 bg-[#FAFAF8]"
+                className="aspect-[5/4] p-2 bg-[#FAFAF8]"
               />
             );
           }
@@ -119,7 +114,7 @@ function CalendarGrid({
           const colIndex = idx % 7;
           const dayReservations = byDate.get(dateStr) ?? [];
 
-          let cellClass = 'min-h-[145px] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
+          let cellClass = 'aspect-[5/4] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
           if (isToday) {
             cellClass += ' bg-brand-primary/5 ring-1 ring-inset ring-brand-primary/30';
           } else {
