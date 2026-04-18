@@ -11,6 +11,15 @@ from .views import (
     AdminReservationListView,
     AdminReservationCancelView,
     AdminReservationDeleteView,
+    AdminLeaderListCreateView,
+    AdminLeaderDetailView,
+    AdminTeamListCreateView,
+    AdminTeamDetailView,
+    AdminBuildingListCreateView,
+    AdminBuildingDetailView,
+    AdminSpaceListCreateView,
+    AdminSpaceDetailView,
+    AdminReservationStatusView,
 )
 
 urlpatterns = [
@@ -22,7 +31,16 @@ urlpatterns = [
     path("reservations/<int:pk>/ticket/",              ReservationTicketView.as_view()),
     path("reservations/<int:pk>/cancel/",              ReservationPublicCancelView.as_view()),
     path("admin/login/",                               AdminLoginView.as_view()),
+    path("admin/leaders/",                             AdminLeaderListCreateView.as_view()),
+    path("admin/leaders/<int:pk>/",                    AdminLeaderDetailView.as_view()),
+    path("admin/teams/",                               AdminTeamListCreateView.as_view()),
+    path("admin/teams/<int:pk>/",                      AdminTeamDetailView.as_view()),
+    path("admin/buildings/",                           AdminBuildingListCreateView.as_view()),
+    path("admin/buildings/<int:pk>/",                  AdminBuildingDetailView.as_view()),
+    path("admin/spaces/",                              AdminSpaceListCreateView.as_view()),
+    path("admin/spaces/<int:pk>/",                     AdminSpaceDetailView.as_view()),
     path("admin/reservations/",                        AdminReservationListView.as_view()),
     path("admin/reservations/<int:pk>/cancel/",        AdminReservationCancelView.as_view()),
+    path("admin/reservations/<int:pk>/status/",        AdminReservationStatusView.as_view()),
     path("admin/reservations/<int:pk>/",               AdminReservationDeleteView.as_view()),
 ]

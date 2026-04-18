@@ -1,13 +1,21 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Building, Space, Reservation, Team
+from .models import Building, Leader, Space, Reservation, Team
+
+
+class LeaderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Leader
+        fields = ["id", "name", "phone"]
 
 
 class TeamSerializer(serializers.ModelSerializer):
+    leader = LeaderSerializer(read_only=True)
+
     class Meta:
-        model = Team
-        fields = ["id", "name", "leader_phone"]
+        model  = Team
+        fields = ["id", "name", "category", "leader"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -137,3 +145,62 @@ class SpaceAvailabilityQuerySerializer(serializers.Serializer):
         if data["end_datetime"] <= data["start_datetime"]:
             raise serializers.ValidationError("종료 일시는 시작 일시보다 늦어야 합니다.")
         return data
+
+
+# ── Admin CRUD Serializers ────────────────────────────────────────────────────
+
+class AdminLeaderSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Leader
+        fields = ["id", "name", "phone", "is_active", "created_at"]
+
+
+class AdminLeaderWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Leader
+        fields = ["name", "phone"]
+
+
+class AdminTeamSerializer(serializers.ModelSerializer):
+    leader = AdminLeaderSerializer(read_only=True)
+
+    class Meta:
+        model  = Team
+        fields = ["id", "name", "category", "leader", "is_active", "created_at"]
+
+
+class AdminTeamWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Team
+        fields = ["name", "category", "leader"]
+
+
+class AdminBuildingSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Building
+        fields = ["id", "name", "description", "is_active", "created_at"]
+
+
+class AdminBuildingWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Building
+        fields = ["name", "description"]
+
+
+class AdminSpaceSerializer(serializers.ModelSerializer):
+    building = BuildingSerializer(read_only=True)
+
+    class Meta:
+        model  = Space
+        fields = ["id", "building", "name", "floor", "capacity", "description", "is_active", "created_at"]
+
+
+class AdminSpaceWriteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Space
+        fields = ["building", "name", "floor", "capacity", "description"]
+
+
+class AdminReservationStatusSerializer(serializers.Serializer):
+    status     = serializers.ChoiceField(choices=["confirmed", "rejected"])
+    admin_note = serializers.CharField(required=False, allow_blank=True, default="")

@@ -2,12 +2,40 @@ from django.db import models
 from django.utils import timezone
 
 
+class Leader(models.Model):
+    name       = models.CharField(max_length=50)
+    phone      = models.CharField(max_length=20)
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "leaders"
+
+    def __str__(self):
+        return self.name
+
+
 class Team(models.Model):
-    name         = models.CharField(max_length=100, unique=True)
-    leader_phone = models.CharField(max_length=20)
-    is_active    = models.BooleanField(default=True)
-    created_at   = models.DateTimeField(auto_now_add=True)
-    updated_at   = models.DateTimeField(auto_now=True)
+    CATEGORY_CHOICES = [
+        ("사역팀",       "사역팀"),
+        ("교회학교",     "교회학교"),
+        ("찬양대",       "찬양대"),
+        ("권사회",       "권사회"),
+        ("안수집사회",   "안수집사회"),
+        ("여전도연합회", "여전도연합회"),
+        ("여전도회",     "여전도회"),
+        ("남선교회",     "남선교회"),
+        ("청년회",       "청년회"),
+        ("교구",         "교구(구역)"),
+    ]
+
+    name       = models.CharField(max_length=100, unique=True)
+    category   = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
+    leader     = models.ForeignKey(Leader, on_delete=models.PROTECT, null=True, blank=True, related_name="teams")
+    is_active  = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "teams"

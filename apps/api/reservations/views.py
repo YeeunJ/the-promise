@@ -11,8 +11,17 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Building, Reservation, Space, Team
+from .models import Building, Leader, Reservation, Space, Team
 from .serializers import (
+    AdminBuildingSerializer,
+    AdminBuildingWriteSerializer,
+    AdminLeaderSerializer,
+    AdminLeaderWriteSerializer,
+    AdminReservationStatusSerializer,
+    AdminSpaceSerializer,
+    AdminSpaceWriteSerializer,
+    AdminTeamSerializer,
+    AdminTeamWriteSerializer,
     BuildingWithSpacesSerializer,
     OverlappingSlotSerializer,
     ReservationCancelSerializer,
@@ -30,7 +39,7 @@ from .ticket import generate_ticket_image
 class TeamListView(APIView):
     @extend_schema(responses=TeamSerializer(many=True))
     def get(self, request):
-        teams = Team.objects.filter(is_active=True)
+        teams = Team.objects.filter(is_active=True).select_related("leader").order_by("category", "name")
         return Response(TeamSerializer(teams, many=True).data)
 
 
@@ -348,6 +357,32 @@ class AdminReservationDeleteView(APIView):
 
     @extend_schema(
         responses={
+            200: ReservationSerializer,
+            401: OpenApiResponse(
+                response=inline_serializer("ReservationDetailUnauthorizedResponse", fields={"detail": serializers.CharField()}),
+                description="Authorization 토큰이 없거나 유효하지 않은 경우",
+            ),
+            404: OpenApiResponse(
+                response=inline_serializer("ReservationDetailNotFoundResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="예약 없음 또는 삭제된 예약 — `not_found`",
+            ),
+        },
+    )
+    def get(self, request, pk):
+        try:
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
+        except Reservation.DoesNotExist:
+            return Response(
+                {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(ReservationSerializer(reservation).data)
+
+    @extend_schema(
+        responses={
             204: OpenApiResponse(description="소프트 삭제 완료"),
             401: OpenApiResponse(
                 response=inline_serializer("DeleteUnauthorizedResponse", fields={"detail": serializers.CharField()}),
@@ -563,5 +598,264 @@ class AdminReservationCancelView(APIView):
         serializer.is_valid(raise_exception=True)
         reservation.status = Reservation.Status.CANCELLED
         reservation.admin_note = serializer.validated_data["admin_note"]
+        reservation.save()
+        return Response(ReservationSerializer(reservation).data)
+
+
+# ── Admin CRUD Views ──────────────────────────────────────────────────────────
+
+def _admin_validation_error(errors):
+    """DRF serializer 에러를 커스텀 포맷으로 변환."""
+    for field, msgs in errors.items():
+        msg = str(msgs[0]) if field == "non_field_errors" else f"{field}: {msgs[0]}"
+        break
+    return Response({"error": "validation_error", "message": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AdminLeaderListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=AdminLeaderSerializer(many=True))
+    def get(self, request):
+        leaders = Leader.objects.all().order_by("name")
+        return Response(AdminLeaderSerializer(leaders, many=True).data)
+
+    @extend_schema(request=AdminLeaderWriteSerializer, responses={201: AdminLeaderSerializer})
+    def post(self, request):
+        ser = AdminLeaderWriteSerializer(data=request.data)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        leader = ser.save()
+        return Response(AdminLeaderSerializer(leader).data, status=status.HTTP_201_CREATED)
+
+
+class AdminLeaderDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_leader(self, pk):
+        try:
+            return Leader.objects.get(pk=pk)
+        except Leader.DoesNotExist:
+            return None
+
+    @extend_schema(request=AdminLeaderWriteSerializer, responses={200: AdminLeaderSerializer})
+    def patch(self, request, pk):
+        leader = self._get_leader(pk)
+        if leader is None:
+            return Response({"error": "not_found", "message": "리더를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        ser = AdminLeaderWriteSerializer(leader, data=request.data, partial=True)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        ser.save()
+        return Response(AdminLeaderSerializer(leader).data)
+
+    @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})
+    def delete(self, request, pk):
+        leader = self._get_leader(pk)
+        if leader is None:
+            return Response({"error": "not_found", "message": "리더를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        leader.is_active = False
+        leader.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminTeamListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=AdminTeamSerializer(many=True))
+    def get(self, request):
+        teams = Team.objects.all().select_related("leader").order_by("category", "name")
+        return Response(AdminTeamSerializer(teams, many=True).data)
+
+    @extend_schema(request=AdminTeamWriteSerializer, responses={201: AdminTeamSerializer})
+    def post(self, request):
+        ser = AdminTeamWriteSerializer(data=request.data)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        team = Team.objects.select_related("leader").get(pk=ser.save().pk)
+        return Response(AdminTeamSerializer(team).data, status=status.HTTP_201_CREATED)
+
+
+class AdminTeamDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_team(self, pk):
+        try:
+            return Team.objects.select_related("leader").get(pk=pk)
+        except Team.DoesNotExist:
+            return None
+
+    @extend_schema(request=AdminTeamWriteSerializer, responses={200: AdminTeamSerializer})
+    def patch(self, request, pk):
+        team = self._get_team(pk)
+        if team is None:
+            return Response({"error": "not_found", "message": "팀을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        ser = AdminTeamWriteSerializer(team, data=request.data, partial=True)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        ser.save()
+        team = Team.objects.select_related("leader").get(pk=team.pk)
+        return Response(AdminTeamSerializer(team).data)
+
+    @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})
+    def delete(self, request, pk):
+        team = self._get_team(pk)
+        if team is None:
+            return Response({"error": "not_found", "message": "팀을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        team.is_active = False
+        team.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminBuildingListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=AdminBuildingSerializer(many=True))
+    def get(self, request):
+        buildings = Building.objects.all().order_by("name")
+        return Response(AdminBuildingSerializer(buildings, many=True).data)
+
+    @extend_schema(request=AdminBuildingWriteSerializer, responses={201: AdminBuildingSerializer})
+    def post(self, request):
+        ser = AdminBuildingWriteSerializer(data=request.data)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        building = ser.save()
+        return Response(AdminBuildingSerializer(building).data, status=status.HTTP_201_CREATED)
+
+
+class AdminBuildingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_building(self, pk):
+        try:
+            return Building.objects.get(pk=pk)
+        except Building.DoesNotExist:
+            return None
+
+    @extend_schema(request=AdminBuildingWriteSerializer, responses={200: AdminBuildingSerializer})
+    def patch(self, request, pk):
+        building = self._get_building(pk)
+        if building is None:
+            return Response({"error": "not_found", "message": "건물을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        ser = AdminBuildingWriteSerializer(building, data=request.data, partial=True)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        ser.save()
+        return Response(AdminBuildingSerializer(building).data)
+
+    @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})
+    def delete(self, request, pk):
+        building = self._get_building(pk)
+        if building is None:
+            return Response({"error": "not_found", "message": "건물을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if building.spaces.filter(is_active=True).exists():
+            return Response(
+                {"error": "conflict", "message": "활성 공간이 있어 삭제할 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        building.is_active = False
+        building.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminSpaceListCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(responses=AdminSpaceSerializer(many=True))
+    def get(self, request):
+        spaces = Space.objects.all().select_related("building").order_by("building__name", "name")
+        return Response(AdminSpaceSerializer(spaces, many=True).data)
+
+    @extend_schema(request=AdminSpaceWriteSerializer, responses={201: AdminSpaceSerializer})
+    def post(self, request):
+        ser = AdminSpaceWriteSerializer(data=request.data)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        space = Space.objects.select_related("building").get(pk=ser.save().pk)
+        return Response(AdminSpaceSerializer(space).data, status=status.HTTP_201_CREATED)
+
+
+class AdminSpaceDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def _get_space(self, pk):
+        try:
+            return Space.objects.select_related("building").get(pk=pk)
+        except Space.DoesNotExist:
+            return None
+
+    @extend_schema(request=AdminSpaceWriteSerializer, responses={200: AdminSpaceSerializer})
+    def patch(self, request, pk):
+        space = self._get_space(pk)
+        if space is None:
+            return Response({"error": "not_found", "message": "공간을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        ser = AdminSpaceWriteSerializer(space, data=request.data, partial=True)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
+        ser.save()
+        return Response(AdminSpaceSerializer(space).data)
+
+    @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})
+    def delete(self, request, pk):
+        space = self._get_space(pk)
+        if space is None:
+            return Response({"error": "not_found", "message": "공간을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        space.is_active = False
+        space.save()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class AdminReservationStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        request=AdminReservationStatusSerializer,
+        responses={
+            200: ReservationSerializer,
+            400: OpenApiResponse(
+                response=inline_serializer("StatusChangeErrorResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description=(
+                    "상태 변경 불가\n\n"
+                    "- pending 아닌 예약 변경 시도 — `invalid_status_transition`\n"
+                    "- confirmed 변경 시 충돌 — `conflict`"
+                ),
+            ),
+            404: OpenApiResponse(
+                response=inline_serializer("StatusChangeNotFoundResponse", fields={
+                    "error": serializers.CharField(),
+                    "message": serializers.CharField(),
+                }),
+                description="예약 없음 또는 삭제된 예약 — `not_found`",
+            ),
+        },
+    )
+    def patch(self, request, pk):
+        try:
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
+        except Reservation.DoesNotExist:
+            return Response({"error": "not_found", "message": "예약을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        if reservation.status != Reservation.Status.PENDING:
+            return Response(
+                {"error": "invalid_status_transition", "message": "pending 상태인 예약만 변경할 수 있습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        ser = AdminReservationStatusSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        new_status = ser.validated_data["status"]
+
+        if new_status == Reservation.Status.CONFIRMED and reservation.has_conflict():
+            return Response(
+                {"error": "conflict", "message": "해당 시간대에 이미 확정된 예약이 있습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        reservation.status = new_status
+        reservation.admin_note = ser.validated_data["admin_note"]
         reservation.save()
         return Response(ReservationSerializer(reservation).data)
