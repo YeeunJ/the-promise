@@ -6,7 +6,7 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Building, Leader, Reservation, Space, Team
+from .models import Building, Department, Pastor, Reservation, Space, Team
 
 
 class BaseTestCase(TestCase):
@@ -31,7 +31,13 @@ class BaseTestCase(TestCase):
             is_active=False,
         )
 
-        self.leader = Leader.objects.create(name="홍길동 목사", phone="010-0000-0000")
+        self.base_dept = Department.objects.create(name="청년부", display_order=7)
+        self.base_team = Team.objects.create(
+            name="디모데(1청년부)",
+            department=self.base_dept,
+            leader_phone="01098765432",
+        )
+
         self.admin = User.objects.create_superuser(username="admin", password="admin1234")
         self.token = Token.objects.create(user=self.admin)
 
@@ -44,7 +50,7 @@ class BaseTestCase(TestCase):
             space=space or self.space,
             applicant_name="홍길동",
             applicant_phone="01012345678",
-            applicant_team="청년부",
+            team=self.base_team,
             leader_phone="01098765432",
             headcount=10,
             purpose="팀 모임",
@@ -101,18 +107,13 @@ class HasConflictTest(BaseTestCase):
 class TeamListViewTest(BaseTestCase):
     """GET /api/v1/teams/"""
 
-    def _make_team(self, name="청년부", category="청년회", leader=None, is_active=True):
-        return Team.objects.create(
-            name=name, category=category,
-            leader=leader or self.leader, is_active=is_active,
-        )
-
-    def test_returns_active_teams_with_leader(self):
-        self._make_team("1청년부")
-        self._make_team("2청년부")
+    def test_returns_active_teams(self):
+        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
+        Team.objects.create(name="찬양팀", leader_phone="01098765432", is_active=True)
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 2)
+        # base_team(setUp) + 2 newly created = 3
+        self.assertEqual(len(response.data), 3)
 
     def test_inactive_team_excluded(self):
         self._make_team("활성팀")
@@ -121,18 +122,20 @@ class TeamListViewTest(BaseTestCase):
         names = [t["name"] for t in response.data]
         self.assertNotIn("비활성팀", names)
 
-    def test_response_includes_category_and_leader(self):
-        self._make_team()
+    def test_response_includes_leader_phone(self):
+        Team.objects.all().delete()
+        Team.objects.create(name="청년부", leader_phone="01012345678", is_active=True)
         response = self.client.get("/api/v1/teams/")
-        item = response.data[0]
-        self.assertIn("category", item)
-        self.assertIn("leader", item)
-        self.assertIn("name", item["leader"])
-        self.assertIn("phone", item["leader"])
+        self.assertIn("leader_phone", response.data[0])
+        self.assertEqual(response.data[0]["leader_phone"], "01012345678")
 
     def test_returns_empty_when_no_teams(self):
+        Team.objects.all().delete()
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.data, [])
+
+    def _make_team(self, name, is_active=True):
+        return Team.objects.create(name=name, leader_phone="010-0000-0000", is_active=is_active)
 
 
 class SpaceListViewTest(BaseTestCase):
@@ -165,7 +168,7 @@ class ReservationCreateTest(BaseTestCase):
             "space": self.space.pk,
             "applicant_name": "홍길동",
             "applicant_phone": "01012345678",
-            "applicant_team": "청년부",
+            "team": self.base_team.pk,
             "leader_phone": "01098765432",
             "headcount": 10,
             "purpose": "팀 모임",
@@ -350,61 +353,6 @@ class AdminLoginViewTest(BaseTestCase):
         self.assertEqual(response.data["error"], "unauthorized")
 
 
-# ─── Admin Leader CRUD ────────────────────────────────────────────────────────
-
-class AdminLeaderTest(BaseTestCase):
-    """GET·POST /admin/leaders/  |  PATCH·DELETE /admin/leaders/<pk>/"""
-
-    def setUp(self):
-        super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-    def test_list_all_leaders(self):
-        response = self.client.get("/api/v1/admin/leaders/")
-        self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(len(response.data), 1)
-
-    def test_create_leader(self):
-        response = self.client.post("/api/v1/admin/leaders/",
-                                    {"name": "신규리더", "phone": "010-1234-5678"}, format="json")
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["name"], "신규리더")
-        self.assertTrue(response.data["is_active"])
-
-    def test_create_leader_missing_name_400(self):
-        response = self.client.post("/api/v1/admin/leaders/",
-                                    {"phone": "010-0000-0000"}, format="json")
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["error"], "validation_error")
-
-    def test_patch_leader(self):
-        response = self.client.patch(f"/api/v1/admin/leaders/{self.leader.pk}/",
-                                     {"name": "수정된리더"}, format="json")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["name"], "수정된리더")
-
-    def test_patch_leader_not_found(self):
-        response = self.client.patch("/api/v1/admin/leaders/9999/",
-                                     {"name": "없음"}, format="json")
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.data["error"], "not_found")
-
-    def test_soft_delete_leader(self):
-        response = self.client.delete(f"/api/v1/admin/leaders/{self.leader.pk}/")
-        self.assertEqual(response.status_code, 204)
-        self.leader.refresh_from_db()
-        self.assertFalse(self.leader.is_active)
-
-    def test_soft_delete_not_found(self):
-        response = self.client.delete("/api/v1/admin/leaders/9999/")
-        self.assertEqual(response.status_code, 404)
-
-    def test_401_without_token(self):
-        self.client.credentials()
-        response = self.client.get("/api/v1/admin/leaders/")
-        self.assertEqual(response.status_code, 401)
-
-
 # ─── Admin Team CRUD ──────────────────────────────────────────────────────────
 
 class AdminTeamTest(BaseTestCase):
@@ -413,38 +361,41 @@ class AdminTeamTest(BaseTestCase):
     def setUp(self):
         super().setUp()
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-        self.team = Team.objects.create(name="청년팀", category="청년회", leader=self.leader)
+        self.dept = Department.objects.create(name="사역부", display_order=1)
+        self.team = Team.objects.create(name="청년팀", department=self.dept, leader_phone="010-0000-0000")
 
     def test_list_includes_inactive(self):
-        Team.objects.create(name="비활성팀", category="청년회", is_active=False)
+        Team.objects.create(name="비활성팀", department=self.dept, leader_phone="010-0000-0000", is_active=False)
         response = self.client.get("/api/v1/admin/teams/")
         self.assertEqual(response.status_code, 200)
         names = [t["name"] for t in response.data]
         self.assertIn("비활성팀", names)
 
-    def test_list_includes_category_and_leader(self):
+    def test_list_includes_department_and_leader_phone(self):
         response = self.client.get("/api/v1/admin/teams/")
         item = next(t for t in response.data if t["name"] == "청년팀")
-        self.assertEqual(item["category"], "청년회")
-        self.assertEqual(item["leader"]["name"], "홍길동 목사")
+        self.assertEqual(item["department"]["name"], "사역부")
+        self.assertEqual(item["leader_phone"], "010-0000-0000")
 
     def test_create_team(self):
         response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "신규팀", "category": "사역팀", "leader": self.leader.pk},
+                                    {"name": "신규팀", "department": self.dept.pk, "leader_phone": "010-1234-5678"},
                                     format="json")
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "신규팀")
-        self.assertEqual(response.data["leader"]["id"], self.leader.pk)
+        self.assertEqual(response.data["department"]["id"], self.dept.pk)
 
-    def test_create_team_missing_category_400(self):
+    def test_create_team_missing_name_400(self):
         response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "카테고리없음"}, format="json")
+                                    {"department": self.dept.pk, "leader_phone": "010-0000-0000"},
+                                    format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
-    def test_create_team_duplicate_name_400(self):
+    def test_create_team_duplicate_name_same_department_400(self):
         response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "청년팀", "category": "청년회"}, format="json")
+                                    {"name": "청년팀", "department": self.dept.pk, "leader_phone": "010-0000-0000"},
+                                    format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 

@@ -11,12 +11,10 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import Building, Leader, Reservation, Space, Team
+from .models import Building, Reservation, Space, Team
 from .serializers import (
     AdminBuildingSerializer,
     AdminBuildingWriteSerializer,
-    AdminLeaderSerializer,
-    AdminLeaderWriteSerializer,
     AdminReservationStatusSerializer,
     AdminSpaceSerializer,
     AdminSpaceWriteSerializer,
@@ -39,7 +37,7 @@ from .ticket import generate_ticket_image
 class TeamListView(APIView):
     @extend_schema(responses=TeamSerializer(many=True))
     def get(self, request):
-        teams = Team.objects.filter(is_active=True).select_related("leader").order_by("category", "name")
+        teams = Team.objects.filter(is_active=True).order_by("name")
         return Response(TeamSerializer(teams, many=True).data)
 
 
@@ -612,59 +610,12 @@ def _admin_validation_error(errors):
     return Response({"error": "validation_error", "message": msg}, status=status.HTTP_400_BAD_REQUEST)
 
 
-class AdminLeaderListCreateView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    @extend_schema(responses=AdminLeaderSerializer(many=True))
-    def get(self, request):
-        leaders = Leader.objects.all().order_by("name")
-        return Response(AdminLeaderSerializer(leaders, many=True).data)
-
-    @extend_schema(request=AdminLeaderWriteSerializer, responses={201: AdminLeaderSerializer})
-    def post(self, request):
-        ser = AdminLeaderWriteSerializer(data=request.data)
-        if not ser.is_valid():
-            return _admin_validation_error(ser.errors)
-        leader = ser.save()
-        return Response(AdminLeaderSerializer(leader).data, status=status.HTTP_201_CREATED)
-
-
-class AdminLeaderDetailView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def _get_leader(self, pk):
-        try:
-            return Leader.objects.get(pk=pk)
-        except Leader.DoesNotExist:
-            return None
-
-    @extend_schema(request=AdminLeaderWriteSerializer, responses={200: AdminLeaderSerializer})
-    def patch(self, request, pk):
-        leader = self._get_leader(pk)
-        if leader is None:
-            return Response({"error": "not_found", "message": "리더를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-        ser = AdminLeaderWriteSerializer(leader, data=request.data, partial=True)
-        if not ser.is_valid():
-            return _admin_validation_error(ser.errors)
-        ser.save()
-        return Response(AdminLeaderSerializer(leader).data)
-
-    @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})
-    def delete(self, request, pk):
-        leader = self._get_leader(pk)
-        if leader is None:
-            return Response({"error": "not_found", "message": "리더를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-        leader.is_active = False
-        leader.save()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
 class AdminTeamListCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     @extend_schema(responses=AdminTeamSerializer(many=True))
     def get(self, request):
-        teams = Team.objects.all().select_related("leader").order_by("category", "name")
+        teams = Team.objects.all().select_related("department", "pastor").order_by("department__name", "name")
         return Response(AdminTeamSerializer(teams, many=True).data)
 
     @extend_schema(request=AdminTeamWriteSerializer, responses={201: AdminTeamSerializer})
@@ -672,7 +623,7 @@ class AdminTeamListCreateView(APIView):
         ser = AdminTeamWriteSerializer(data=request.data)
         if not ser.is_valid():
             return _admin_validation_error(ser.errors)
-        team = Team.objects.select_related("leader").get(pk=ser.save().pk)
+        team = Team.objects.select_related("department", "pastor").get(pk=ser.save().pk)
         return Response(AdminTeamSerializer(team).data, status=status.HTTP_201_CREATED)
 
 
@@ -681,7 +632,7 @@ class AdminTeamDetailView(APIView):
 
     def _get_team(self, pk):
         try:
-            return Team.objects.select_related("leader").get(pk=pk)
+            return Team.objects.select_related("department", "pastor").get(pk=pk)
         except Team.DoesNotExist:
             return None
 
@@ -694,7 +645,7 @@ class AdminTeamDetailView(APIView):
         if not ser.is_valid():
             return _admin_validation_error(ser.errors)
         ser.save()
-        team = Team.objects.select_related("leader").get(pk=team.pk)
+        team = Team.objects.select_related("department", "pastor").get(pk=team.pk)
         return Response(AdminTeamSerializer(team).data)
 
     @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})

@@ -1,21 +1,19 @@
 from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
-from .models import Building, Leader, Space, Reservation, Team
+from .models import Building, Department, Pastor, Space, Reservation, Team
 
 
-class LeaderSerializer(serializers.ModelSerializer):
+class PastorSerializer(serializers.ModelSerializer):
     class Meta:
-        model  = Leader
-        fields = ["id", "name", "phone"]
+        model  = Pastor
+        fields = ["id", "name", "title"]
 
 
 class TeamSerializer(serializers.ModelSerializer):
-    leader = LeaderSerializer(read_only=True)
-
     class Meta:
         model  = Team
-        fields = ["id", "name", "category", "leader"]
+        fields = ["id", "name", "leader_phone"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):
@@ -41,16 +39,21 @@ class BuildingWithSpacesSerializer(serializers.ModelSerializer):
 
 
 class ReservationSerializer(serializers.ModelSerializer):
-    space = SpaceSerializer(read_only=True)
+    space          = SpaceSerializer(read_only=True)
+    applicant_team = serializers.SerializerMethodField()
 
     class Meta:
         model = Reservation
         fields = [
             "id", "space", "applicant_name", "applicant_phone",
-            "applicant_team", "leader_phone", "headcount",
+            "team", "custom_team_name", "applicant_team",
+            "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
             "status", "admin_note", "created_at",
         ]
+
+    def get_applicant_team(self, obj) -> str:
+        return obj.team.name if obj.team else obj.custom_team_name
 
 
 class ReservationCreateSerializer(serializers.ModelSerializer):
@@ -58,7 +61,7 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
         model = Reservation
         fields = [
             "space", "applicant_name", "applicant_phone",
-            "applicant_team", "leader_phone", "headcount",
+            "team", "custom_team_name", "leader_phone", "headcount",
             "purpose", "start_datetime", "end_datetime",
         ]
 
@@ -89,8 +92,6 @@ class ReservationCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         with transaction.atomic():
-            # 같은 공간에 대한 동시 요청을 직렬화
-            # select_for_update()로 space row를 잠가 conflict 체크~저장을 원자적으로 처리
             Space.objects.select_for_update().get(pk=validated_data['space'].pk)
 
             reservation = Reservation(**validated_data)
@@ -149,30 +150,25 @@ class SpaceAvailabilityQuerySerializer(serializers.Serializer):
 
 # ── Admin CRUD Serializers ────────────────────────────────────────────────────
 
-class AdminLeaderSerializer(serializers.ModelSerializer):
+class AdminDepartmentSerializer(serializers.ModelSerializer):
     class Meta:
-        model  = Leader
-        fields = ["id", "name", "phone", "is_active", "created_at"]
-
-
-class AdminLeaderWriteSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = Leader
-        fields = ["name", "phone"]
+        model  = Department
+        fields = ["id", "name"]
 
 
 class AdminTeamSerializer(serializers.ModelSerializer):
-    leader = AdminLeaderSerializer(read_only=True)
+    department = AdminDepartmentSerializer(read_only=True)
+    pastor     = PastorSerializer(read_only=True)
 
     class Meta:
         model  = Team
-        fields = ["id", "name", "category", "leader", "is_active", "created_at"]
+        fields = ["id", "name", "department", "pastor", "leader_phone", "is_active", "created_at"]
 
 
 class AdminTeamWriteSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Team
-        fields = ["name", "category", "leader"]
+        fields = ["name", "department", "pastor", "leader_phone"]
 
 
 class AdminBuildingSerializer(serializers.ModelSerializer):

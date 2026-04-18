@@ -2,46 +2,75 @@ from django.db import models
 from django.utils import timezone
 
 
-class Leader(models.Model):
+class Pastor(models.Model):
     name       = models.CharField(max_length=50)
+    title      = models.CharField(max_length=50)
     phone      = models.CharField(max_length=20)
     is_active  = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        db_table = "leaders"
+        db_table = "pastors"
+
+    def __str__(self):
+        return f"{self.name} {self.title}"
+
+
+class Department(models.Model):
+    name          = models.CharField(max_length=100)
+    display_order = models.IntegerField()
+    pastor        = models.ForeignKey(
+                        Pastor,
+                        on_delete=models.SET_NULL,
+                        null=True,
+                        blank=True,
+                        related_name="departments",
+                    )
+    is_active     = models.BooleanField(default=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    updated_at    = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = "departments"
+        ordering = ["display_order"]
 
     def __str__(self):
         return self.name
 
 
 class Team(models.Model):
-    CATEGORY_CHOICES = [
-        ("사역팀",       "사역팀"),
-        ("교회학교",     "교회학교"),
-        ("찬양대",       "찬양대"),
-        ("권사회",       "권사회"),
-        ("안수집사회",   "안수집사회"),
-        ("여전도연합회", "여전도연합회"),
-        ("여전도회",     "여전도회"),
-        ("남선교회",     "남선교회"),
-        ("청년회",       "청년회"),
-        ("교구",         "교구(구역)"),
-    ]
-
-    name       = models.CharField(max_length=100, unique=True)
-    category   = models.CharField(max_length=20, choices=CATEGORY_CHOICES)
-    leader     = models.ForeignKey(Leader, on_delete=models.PROTECT, null=True, blank=True, related_name="teams")
-    is_active  = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    name         = models.CharField(max_length=100)
+    department   = models.ForeignKey(
+                       Department,
+                       on_delete=models.PROTECT,
+                       related_name="teams",
+                       null=True,
+                   )
+    pastor       = models.ForeignKey(
+                       Pastor,
+                       on_delete=models.SET_NULL,
+                       null=True,
+                       blank=True,
+                       related_name="teams",
+                   )
+    leader_phone = models.CharField(max_length=20)
+    is_active    = models.BooleanField(default=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "teams"
+        unique_together = [("department", "name")]
 
     def __str__(self):
         return self.name
+
+    def get_pastor_display(self) -> str | None:
+        pastor = self.pastor or (self.department.pastor if self.department_id else None)
+        if pastor:
+            return f"{pastor.name} {pastor.title}"
+        return None
 
 
 class Building(models.Model):
@@ -83,25 +112,32 @@ class Reservation(models.Model):
         REJECTED  = "rejected",  "거절됨"
         CANCELLED = "cancelled", "취소됨"
 
-    space           = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="reservations")
-    applicant_name  = models.CharField(max_length=50)
-    applicant_phone = models.CharField(max_length=20)
-    applicant_team  = models.CharField(max_length=100)
-    leader_phone    = models.CharField(max_length=20)
-    headcount       = models.PositiveIntegerField()
-    purpose         = models.TextField()
-    start_datetime  = models.DateTimeField()
-    end_datetime    = models.DateTimeField()
-    status          = models.CharField(
-                          max_length=20,
-                          choices=Status.choices,
-                          default=Status.CONFIRMED,
-                      )
-    admin_note      = models.TextField(blank=True, null=True)
-    is_deleted      = models.BooleanField(default=False)
-    deleted_at      = models.DateTimeField(null=True, blank=True)
-    created_at      = models.DateTimeField(auto_now_add=True)
-    updated_at      = models.DateTimeField(auto_now=True)
+    space            = models.ForeignKey(Space, on_delete=models.PROTECT, related_name="reservations")
+    applicant_name   = models.CharField(max_length=50)
+    applicant_phone  = models.CharField(max_length=20)
+    team             = models.ForeignKey(
+                           Team,
+                           on_delete=models.SET_NULL,
+                           null=True,
+                           blank=True,
+                           related_name="reservations",
+                       )
+    custom_team_name = models.CharField(max_length=100, blank=True, default="")
+    leader_phone     = models.CharField(max_length=20)
+    headcount        = models.PositiveIntegerField()
+    purpose          = models.TextField()
+    start_datetime   = models.DateTimeField()
+    end_datetime     = models.DateTimeField()
+    status           = models.CharField(
+                           max_length=20,
+                           choices=Status.choices,
+                           default=Status.CONFIRMED,
+                       )
+    admin_note       = models.TextField(blank=True, null=True)
+    is_deleted       = models.BooleanField(default=False)
+    deleted_at       = models.DateTimeField(null=True, blank=True)
+    created_at       = models.DateTimeField(auto_now_add=True)
+    updated_at       = models.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "reservations"

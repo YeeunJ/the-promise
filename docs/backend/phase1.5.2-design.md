@@ -1,4 +1,4 @@
-# Phase 1.5.2 백엔드 Design — 관리자 CRUD API (Leader 확장 포함)
+# Phase 1.5.2 백엔드 Design — 관리자 CRUD API
 
 ## Context Anchor
 
@@ -6,9 +6,9 @@
 |------|------|
 | **WHY** | 운영팀이 팀·공간 마스터 데이터를 직접 관리하고, pending 예약을 처리할 수 있어야 함 |
 | **WHO** | 교회 관리자 (Token 인증 사용자) |
-| **RISK** | Building 삭제 시 활성 Space → 400 방어. Leader PROTECT FK → Team 삭제 전 리더 변경 필요 |
-| **SUCCESS** | 모든 CRUD 정상 동작 + 미인증 401 + Leader/Team 구조 반영 + 상태 변경 제약 |
-| **SCOPE** | 백엔드 API (Leader 모델 분리 + migration 포함, 프론트 연동은 별도 phase) |
+| **RISK** | Building 삭제 시 활성 Space → 400 방어. Department PROTECT FK → Team 삭제 전 처리 필요 |
+| **SUCCESS** | 모든 CRUD 정상 동작 + 미인증 401 + Pastor/Department/Team 구조 반영 + 상태 변경 제약 |
+| **SCOPE** | 백엔드 API (develop의 Pastor/Department/Team 구조 채택, 마이그레이션 없음, 프론트 연동은 별도 phase) |
 
 ---
 
@@ -21,64 +21,44 @@
 
 ```
 reservations/
-  models.py          ← Leader 모델 추가, Team category+leader FK 추가
-  migrations/
-    0003_leader_team_category_refactor.py  ← Leader 생성, Team 스키마 변경
+  models.py          ← develop 구조 채택 (Pastor, Department, Team 포함)
   serializers.py     ← Admin 시리얼라이저 추가
   views.py           ← Admin CRUD View 클래스 추가
   urls.py            ← URL 패턴 추가
-  fixtures/
-    teams.json       ← Leader 16명 + Team 29개 초기 데이터
 ```
 
 ---
 
 ## 2. 모델 설계
 
-### Leader (신규)
+### Team (develop 구조 채택)
 
-```python
-class Leader(models.Model):
-    name       = models.CharField(max_length=50)
-    phone      = models.CharField(max_length=20)
-    is_active  = models.BooleanField(default=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-    class Meta:
-        db_table = "leaders"
-```
+develop 브랜치의 Pastor/Department 구조를 그대로 사용. 별도 모델 추가 없음.
 
-### Team (개편)
-
-| 필드 | 변경 |
+| 필드 | 내용 |
 |------|------|
-| `leader_phone` | 제거 |
-| `category` | 추가 — 사역팀/교구/교회학교/찬양대/권사회/안수집사회/여전도연합회/여전도회/남선교회/청년회 |
-| `leader` | 추가 — ForeignKey(Leader, PROTECT, null=True) |
+| `department` | ForeignKey(Department, PROTECT, null=True) |
+| `pastor` | ForeignKey(Pastor, SET_NULL, null=True, blank=True) |
+| `leader_phone` | CharField(max_length=20) |
+| unique_together | `(department, name)` |
 
 ---
 
 ## 3. Serializer 설계
 
-### 3.1 Leader
+### 3.1 Team
 
 ```python
-class AdminLeaderSerializer(ModelSerializer):
-    fields = ["id", "name", "phone", "is_active", "created_at"]
+class AdminDepartmentSerializer(ModelSerializer):
+    fields = ["id", "name"]
 
-class AdminLeaderWriteSerializer(ModelSerializer):
-    fields = ["name", "phone"]
-```
-
-### 3.2 Team
-
-```python
 class AdminTeamSerializer(ModelSerializer):
-    leader = AdminLeaderSerializer(read_only=True)
-    fields = ["id", "name", "category", "leader", "is_active", "created_at"]
+    department = AdminDepartmentSerializer(read_only=True)
+    pastor = PastorSerializer(read_only=True)
+    fields = ["id", "name", "department", "pastor", "leader_phone", "is_active", "created_at"]
 
 class AdminTeamWriteSerializer(ModelSerializer):
-    fields = ["name", "category", "leader"]  # leader: FK (id)
+    fields = ["name", "department", "pastor", "leader_phone"]
 ```
 
 ### 3.3 Building
@@ -121,30 +101,14 @@ def _admin_validation_error(errors):
     # DRF serializer errors → {"error": "validation_error", "message": "..."} 포맷
 ```
 
-### 4.2 AdminLeaderListCreateView — `/api/admin/leaders/`
+### 4.2 AdminTeamListCreateView — `/api/admin/teams/`
 
 | Method | 동작 |
 |--------|------|
-| GET | `Leader.objects.all().order_by("name")` |
-| POST | `AdminLeaderWriteSerializer` 검증 후 저장, 201 반환 |
-
-### 4.3 AdminLeaderDetailView — `/api/admin/leaders/<pk>/`
-
-| Method | 동작 |
-|--------|------|
-| PATCH | partial=True로 수정, 200 반환 |
-| DELETE | `is_active=False` 저장, 204 반환 |
-
----
-
-### 4.4 AdminTeamListCreateView — `/api/admin/teams/`
-
-| Method | 동작 |
-|--------|------|
-| GET | `Team.objects.all().select_related("leader")` |
+| GET | `Team.objects.all().select_related("department", "pastor").order_by("department__name", "name")` |
 | POST | `AdminTeamWriteSerializer` 검증 후 저장, select_related로 재조회 후 201 반환 |
 
-### 4.5 AdminTeamDetailView — `/api/admin/teams/<pk>/`
+### 4.3 AdminTeamDetailView — `/api/admin/teams/<pk>/`
 
 | Method | 동작 |
 |--------|------|
@@ -227,8 +191,6 @@ return 200, ReservationSerializer(reservation).data
 ## 5. URL 설계
 
 ```python
-path("admin/leaders/",                             AdminLeaderListCreateView.as_view()),
-path("admin/leaders/<int:pk>/",                    AdminLeaderDetailView.as_view()),
 path("admin/teams/",                               AdminTeamListCreateView.as_view()),
 path("admin/teams/<int:pk>/",                      AdminTeamDetailView.as_view()),
 path("admin/buildings/",                           AdminBuildingListCreateView.as_view()),
@@ -243,12 +205,9 @@ path("admin/reservations/<int:pk>/",               AdminReservationDeleteView.as
 
 ## 6. 구현 순서
 
-1. `models.py` — Leader 모델 추가, Team category/leader FK 추가
-2. `migrations/0003` — Leader 생성, 기존 Team 초기화, Team 스키마 변경
-3. `fixtures/teams.json` — Leader 16명, Team 29개 초기 데이터
-4. `serializers.py` — Admin 시리얼라이저 9종 추가
-5. `views.py` — Leader, Team, Building, Space, Reservation Admin View 추가
-6. `urls.py` — 신규 URL 10개 등록
+1. `serializers.py` — Admin 시리얼라이저 추가 (AdminDepartmentSerializer, AdminTeamSerializer 등)
+2. `views.py` — Team, Building, Space, Reservation Admin View 추가
+3. `urls.py` — 신규 URL 등록
 
 ---
 
@@ -256,9 +215,6 @@ path("admin/reservations/<int:pk>/",               AdminReservationDeleteView.as
 
 | 파일 | 변경 유형 | 영향 |
 |------|----------|------|
-| `models.py` | 추가 + 수정 | Leader 신규, Team 스키마 변경 |
-| `migrations/0003` | 신규 | Leader 생성, Team 재구성 |
-| `fixtures/teams.json` | 신규 | 초기 마스터 데이터 |
 | `serializers.py` | 추가 | 기존 코드 영향 없음 |
 | `views.py` | 추가 + 기존 메서드 추가 | AdminReservationDeleteView.get() 추가 |
 | `urls.py` | 추가 | 기존 URL 패턴 유지 |

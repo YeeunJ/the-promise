@@ -4,8 +4,8 @@
 
 | 관점 | 내용 |
 |------|------|
-| **Problem** | 관리자가 팀·건물·공간 마스터 데이터를 DB 직접 접근 없이 관리할 수 없음. 팀에 구분·리더 이름이 없고 리더 중복 관리 불가 |
-| **Solution** | Token 인증 기반 Admin CRUD REST API 추가 (Leader·Team·Building·Space·Reservation 상태 변경). Leader 별도 모델로 분리 |
+| **Problem** | 관리자가 팀·건물·공간 마스터 데이터를 DB 직접 접근 없이 관리할 수 없음 |
+| **Solution** | Token 인증 기반 Admin CRUD REST API 추가 (Team·Building·Space·Reservation 상태 변경). develop의 Pastor/Department/Team 구조 채택 |
 | **UX Effect** | 관리자 웹 화면에서 데이터 추가·수정·삭제 가능, pending 예약 승인/거절 처리 가능 |
 | **Core Value** | 운영 자율성 확보 — 개발자 개입 없이 마스터 데이터 유지 관리 |
 
@@ -15,8 +15,8 @@
 |------|------|
 | **WHY** | 운영팀이 팀·공간 마스터 데이터를 직접 관리하고, pending 예약을 처리할 수 있어야 함 |
 | **WHO** | 교회 관리자 (슈퍼유저 또는 staff) |
-| **RISK** | Building 삭제 시 활성 Space 존재 → 400 방어. Leader 삭제 시 Team FK PROTECT |
-| **SUCCESS** | 모든 CRUD 정상 동작 + 미인증 401 + Leader/Team 구조 반영 |
+| **RISK** | Building 삭제 시 활성 Space 존재 → 400 방어. Department PROTECT FK → Team 삭제 전 처리 필요 |
+| **SUCCESS** | 모든 CRUD 정상 동작 + 미인증 401 + Pastor/Department/Team 구조 반영 |
 | **SCOPE** | 백엔드 API만 (프론트 연동은 별도 phase) |
 
 ---
@@ -25,25 +25,23 @@
 
 | 모델 | 기존 Admin API | Phase 1.5.2 추가 |
 |------|--------------|-----------------|
-| Leader (신규) | 없음 | CRUD 전체 |
-| Team (개편) | 없음 | CRUD 전체 (category + leader FK 추가, leader_phone 제거) |
+| Team | 없음 | CRUD 전체 (develop의 department FK + pastor FK + leader_phone 구조) |
 | Building | 없음 | CRUD 전체 |
 | Space | 없음 | CRUD 전체 |
 | Reservation | 목록·취소·소프트삭제 | 상세 조회 + 상태 변경 |
 
-### Team 모델 개편
+### Team 모델 (develop 구조 채택)
 
-| 필드 | 변경 |
+develop 브랜치에서 이미 개편된 구조를 그대로 사용:
+
+| 필드 | 내용 |
 |------|------|
-| `leader_phone` | **제거** |
-| `category` | **추가** — 사역팀/교회학교/찬양대/권사회/안수집사회/여전도연합회/여전도회/남선교회/청년회/교구 |
-| `leader` | **추가** — ForeignKey(Leader, PROTECT, null=True) |
+| `department` | ForeignKey(Department, PROTECT, null=True) |
+| `pastor` | ForeignKey(Pastor, SET_NULL, null=True, blank=True) |
+| `leader_phone` | CharField(20) |
+| unique_together | `(department, name)` |
 
-**Leader 모델 (신규)**
-- `name` CharField(50)
-- `phone` CharField(20)
-- `is_active` BooleanField
-- DB table: `leaders`
+Pastor·Department 모델은 develop 브랜치 기존 작업 그대로 사용.
 
 ---
 
@@ -55,17 +53,23 @@
 |--------|-----|------|------|
 | GET | `/api/admin/teams/` | 전체 목록 (비활성 포함) | Token |
 | POST | `/api/admin/teams/` | 팀 생성 | Token |
-| PATCH | `/api/admin/teams/<pk>/` | 팀 수정 (name, leader_phone) | Token |
+| PATCH | `/api/admin/teams/<pk>/` | 팀 수정 (name, department, pastor, leader_phone) | Token |
 | DELETE | `/api/admin/teams/<pk>/` | 소프트 삭제 (is_active=False) | Token |
 
 **Request Body (POST/PATCH)**
 ```json
-{ "name": "청년부", "leader_phone": "010-1234-5678" }
+{ "name": "청년팀", "department": 1, "pastor": 2, "leader_phone": "010-1234-5678" }
 ```
 
 **Response (GET 목록)**
 ```json
-[{ "id": 1, "name": "청년부", "leader_phone": "010-1234-5678", "is_active": true }]
+[{
+  "id": 1, "name": "청년팀",
+  "department": { "id": 1, "name": "청년부" },
+  "pastor": { "id": 2, "name": "홍길동", "title": "목사" },
+  "leader_phone": "010-1234-5678",
+  "is_active": true
+}]
 ```
 
 ---
@@ -145,8 +149,9 @@
 ### 신규 시리얼라이저
 | 이름 | 용도 |
 |------|------|
-| `AdminTeamSerializer` | Team 목록/응답 (is_active 포함) |
-| `AdminTeamWriteSerializer` | Team 생성/수정 입력 |
+| `AdminDepartmentSerializer` | Department 중첩 응답 (id, name) |
+| `AdminTeamSerializer` | Team 목록/응답 (department·pastor 중첩, is_active 포함) |
+| `AdminTeamWriteSerializer` | Team 생성/수정 입력 (department FK, pastor FK, leader_phone) |
 | `AdminBuildingSerializer` | Building 목록/응답 |
 | `AdminBuildingWriteSerializer` | Building 생성/수정 입력 |
 | `AdminSpaceSerializer` | Space 목록/응답 (building 포함) |
