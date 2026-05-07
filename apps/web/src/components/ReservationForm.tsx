@@ -39,18 +39,33 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
   const [isReviewing, setIsReviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [maxReachedStep, setMaxReachedStep] = useState(1);
+
+  function getGlobalStep(popup: Exclude<ActivePopup, null>): number {
+    return POPUP_SEQUENCE.indexOf(popup) + 1;
+  }
 
   function goNext() {
     if (activePopup === null) return;
     const idx = POPUP_SEQUENCE.indexOf(activePopup);
     const next = idx + 1;
-    setActivePopup(next < POPUP_SEQUENCE.length ? POPUP_SEQUENCE[next] : null);
+    if (next < POPUP_SEQUENCE.length) {
+      setMaxReachedStep((prev) => Math.max(prev, next + 1));
+      setActivePopup(POPUP_SEQUENCE[next]);
+    } else {
+      setActivePopup(null);
+    }
   }
 
   function goBack() {
     if (activePopup === null) return;
     const idx = POPUP_SEQUENCE.indexOf(activePopup);
     setActivePopup(idx > 0 ? POPUP_SEQUENCE[idx - 1] : null);
+  }
+
+  function handleStepNavigate(step: number) {
+    const target = POPUP_SEQUENCE[step - 1];
+    if (target) setActivePopup(target);
   }
 
   function resolveEditTarget(errorMessage: string | null): Exclude<ActivePopup, null> {
@@ -64,6 +79,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
 
   function startFlow() {
     setSubmitError(null);
+    setMaxReachedStep(1);
     setActivePopup('applicant');
   }
 
@@ -75,6 +91,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
     setPurpose('');
     setSubmitError(null);
     setIsReviewing(false);
+    setMaxReachedStep(1);
     setActivePopup(null);
   }
 
@@ -192,6 +209,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={applicant}
         onConfirm={(data) => { setApplicant(data); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('applicant')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <SpacePopup
         isOpen={activePopup === 'space'}
@@ -202,6 +223,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         previousSelection={spaceSelection}
         onSelected={(sel) => { setSpaceSelection(sel); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('space')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <HeadcountPopup
         isOpen={activePopup === 'headcount'}
@@ -211,6 +236,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={headcount}
         onConfirm={(val) => { setHeadcount(val); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('headcount')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <DateTimePopup
         isOpen={activePopup === 'datetime'}
@@ -221,6 +250,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={timeSlot}
         onConfirm={(val) => { setTimeSlot(val); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('datetime')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <PurposePopup
         isOpen={activePopup === 'purpose'}
@@ -230,6 +263,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={purpose}
         onConfirm={(val) => { setPurpose(val); setActivePopup(null); setIsReviewing(true); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('purpose')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
     </>
   );
