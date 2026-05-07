@@ -53,7 +53,7 @@ function renderChips(dayReservations: Reservation[]): JSX.Element {
             className={CHIP_BASE}
             style={{ backgroundColor: color.bg, borderLeftColor: color.main }}
           >
-            {r.applicant_team} - {r.space.name}
+            {r.applicant_team || '-'} - {r.space.name}
           </span>
         );
       })}
@@ -98,7 +98,7 @@ function CalendarGrid({
             return (
               <div
                 key={`empty-${idx}`}
-                className="aspect-[5/4] p-2 bg-[#FAFAF8]"
+                className="min-h-[120px] p-2 bg-[#FAFAF8]"
               />
             );
           }
@@ -114,7 +114,7 @@ function CalendarGrid({
           const colIndex = idx % 7;
           const dayReservations = byDate.get(dateStr) ?? [];
 
-          let cellClass = 'aspect-[5/4] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
+          let cellClass = 'min-h-[120px] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
           if (isToday) {
             cellClass += ' bg-brand-primary/5 ring-1 ring-inset ring-brand-primary/30';
           } else {
