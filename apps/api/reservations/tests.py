@@ -244,7 +244,7 @@ class ReservationListViewTest(BaseTestCase):
             "/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_results_for_wrong_phone(self):
         self._make_reservation()
@@ -252,7 +252,7 @@ class ReservationListViewTest(BaseTestCase):
             "/api/v1/reservations/", {"name": "홍길동", "phone": "01099999999"}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data["results"]), 0)
 
     def test_400_when_params_missing(self):
         response = self.client.get("/api/v1/reservations/")
@@ -267,7 +267,7 @@ class ReservationListViewTest(BaseTestCase):
             "/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"}
         )
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data["results"]), 0)
 
 
 class SpaceReservationListViewTest(BaseTestCase):
@@ -350,23 +350,23 @@ class AdminReservationListViewTest(BaseTestCase):
         self._make_reservation()
         response = self.client.get("/api/v1/admin/reservations/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_401_without_token(self):
         self.client.credentials()
         response = self.client.get("/api/v1/admin/reservations/")
         self.assertEqual(response.status_code, 401)
 
-    def test_filter_by_date(self):
+    def test_filter_by_date_range(self):
         self._make_reservation(day=1)
         self._make_reservation(start_hour=14, end_hour=16, day=2)
-        response = self.client.get("/api/v1/admin/reservations/", {"date": "2030-06-01"})
+        response = self.client.get("/api/v1/admin/reservations/", {"from_date": "2030-06-01", "to_date": "2030-06-01"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_400_when_date_format_invalid(self):
         self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-        response = self.client.get("/api/v1/admin/reservations/", {"date": "abc"})
+        response = self.client.get("/api/v1/admin/reservations/", {"from_date": "abc"})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
@@ -375,8 +375,8 @@ class AdminReservationListViewTest(BaseTestCase):
         self._make_reservation(start_hour=14, end_hour=16, status=Reservation.Status.CANCELLED)
         response = self.client.get("/api/v1/admin/reservations/", {"status": "confirmed"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data[0]["status"], "confirmed")
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["status"], "confirmed")
 
     def test_deleted_reservation_not_returned(self):
         r = self._make_reservation()
@@ -384,7 +384,7 @@ class AdminReservationListViewTest(BaseTestCase):
         r.save()
         response = self.client.get("/api/v1/admin/reservations/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(len(response.data["results"]), 0)
 
 
 class AdminReservationCancelViewTest(BaseTestCase):
@@ -1407,3 +1407,303 @@ class AdminReservationDeleteViewTest(BaseTestCase):
         self.assertEqual(response.status_code, 401)
 
 
+
+
+# ─── Phase 1.5.3: 예약 조회 API 개편 ─────────────────────────────────────────
+
+class AdminReservationCurrentListViewTest(BaseTestCase):
+    """GET /api/v1/admin/reservations/current/"""
+
+    PAST_DT   = "2020-01-01T10:00:00+09:00"  # 항상 과거
+    FUTURE_DT = "2030-06-01T10:00:00+09:00"  # 항상 미래
+
+    def setUp(self):
+        super().setUp()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _make_future(self, start_hour=10, end_hour=12, day=1, **kwargs):
+        return self._make_reservation(start_hour=start_hour, end_hour=end_hour, day=day, **kwargs)
+
+    def _make_past(self):
+        import datetime as dt
+        from django.utils import timezone as tz
+        r = Reservation.objects.create(
+            space=self.space,
+            applicant_name="과거인",
+            applicant_phone="01000000000",
+            team=self.base_team,
+            leader_phone="01098765432",
+            headcount=5,
+            purpose="과거 모임",
+            start_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 10, 0)),
+            end_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 12, 0)),
+            status=Reservation.Status.CONFIRMED,
+        )
+        return r
+
+    def test_returns_only_current_reservations(self):
+        self._make_future()
+        self._make_past()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_past_reservation_excluded(self):
+        self._make_past()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_pagination_response_structure(self):
+        self._make_future()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 200)
+        for key in ("count", "page", "page_size", "total_pages", "results"):
+            self.assertIn(key, response.data)
+
+    def test_pagination_page_size(self):
+        for i in range(3):
+            self._make_future(start_hour=10 + i * 2, end_hour=12 + i * 2, day=i + 1)
+        response = self.client.get("/api/v1/admin/reservations/current/", {"page_size": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["total_pages"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+
+    def test_pagination_page2(self):
+        for i in range(3):
+            self._make_future(start_hour=10 + i * 2, end_hour=12 + i * 2, day=i + 1)
+        response = self.client.get("/api/v1/admin/reservations/current/", {"page": 2, "page_size": 2})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+
+    def test_filter_by_status(self):
+        self._make_future(status=Reservation.Status.CONFIRMED)
+        self._make_future(start_hour=14, end_hour=16, status=Reservation.Status.CANCELLED)
+        response = self.client.get("/api/v1/admin/reservations/current/", {"status": "confirmed"})
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["status"], "confirmed")
+
+    def test_filter_by_date_range(self):
+        self._make_future(day=1)
+        self._make_future(start_hour=14, end_hour=16, day=2)
+        response = self.client.get("/api/v1/admin/reservations/current/", {
+            "from_date": "2030-06-01", "to_date": "2030-06-01"
+        })
+        self.assertEqual(response.data["count"], 1)
+
+    def test_filter_by_space_id(self):
+        self._make_future()
+        other_space = Space.objects.create(building=self.building, name="다른공간", is_active=True)
+        self._make_future(space=other_space)
+        response = self.client.get("/api/v1/admin/reservations/current/", {"space_id": self.space.pk})
+        self.assertEqual(response.data["count"], 1)
+
+    def test_filter_by_building_id(self):
+        self._make_future()
+        response = self.client.get("/api/v1/admin/reservations/current/", {"building_id": self.building.pk})
+        self.assertEqual(response.data["count"], 1)
+
+    def test_filter_by_search_name(self):
+        self._make_future()
+        response = self.client.get("/api/v1/admin/reservations/current/", {"search": "홍길동"})
+        self.assertEqual(response.data["count"], 1)
+
+    def test_filter_by_search_phone(self):
+        self._make_future()
+        response = self.client.get("/api/v1/admin/reservations/current/", {"search": "01012345678"})
+        self.assertEqual(response.data["count"], 1)
+
+    def test_default_ordering_asc(self):
+        self._make_future(day=2)
+        self._make_future(day=1)
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        results = response.data["results"]
+        self.assertLessEqual(results[0]["start_datetime"], results[1]["start_datetime"])
+
+    def test_ordering_desc(self):
+        self._make_future(day=1)
+        self._make_future(day=2)
+        response = self.client.get("/api/v1/admin/reservations/current/", {"ordering": "-start_datetime"})
+        results = response.data["results"]
+        self.assertGreaterEqual(results[0]["start_datetime"], results[1]["start_datetime"])
+
+    def test_400_invalid_date_format(self):
+        response = self.client.get("/api/v1/admin/reservations/current/", {"from_date": "abc"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_401_without_token(self):
+        self.client.credentials()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 401)
+
+
+class AdminReservationPastListViewTest(BaseTestCase):
+    """GET /api/v1/admin/reservations/past/"""
+
+    def setUp(self):
+        super().setUp()
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+
+    def _make_past(self, day=1):
+        import datetime as dt
+        from django.utils import timezone as tz
+        return Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=self.base_team,
+            leader_phone="01098765432",
+            headcount=5,
+            purpose="과거 모임",
+            start_datetime=tz.make_aware(dt.datetime(2020, 1, day, 10, 0)),
+            end_datetime=tz.make_aware(dt.datetime(2020, 1, day, 12, 0)),
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def test_returns_only_past_reservations(self):
+        self._make_past()
+        self._make_reservation()  # future
+        response = self.client.get("/api/v1/admin/reservations/past/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_current_reservation_excluded(self):
+        self._make_reservation()
+        response = self.client.get("/api/v1/admin/reservations/past/")
+        self.assertEqual(response.data["count"], 0)
+
+    def test_default_ordering_desc(self):
+        self._make_past(day=1)
+        self._make_past(day=2)
+        response = self.client.get("/api/v1/admin/reservations/past/")
+        results = response.data["results"]
+        self.assertGreaterEqual(results[0]["start_datetime"], results[1]["start_datetime"])
+
+    def test_pagination(self):
+        for i in range(1, 4):
+            self._make_past(day=i)
+        response = self.client.get("/api/v1/admin/reservations/past/", {"page_size": 2})
+        self.assertEqual(response.data["total_pages"], 2)
+        self.assertEqual(len(response.data["results"]), 2)
+
+    def test_401_without_token(self):
+        self.client.credentials()
+        response = self.client.get("/api/v1/admin/reservations/past/")
+        self.assertEqual(response.status_code, 401)
+
+
+class ReservationCurrentListViewTest(BaseTestCase):
+    """GET /api/v1/reservations/current/"""
+
+    def _make_past(self):
+        import datetime as dt
+        from django.utils import timezone as tz
+        return Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=self.base_team,
+            leader_phone="01098765432",
+            headcount=5,
+            purpose="과거 모임",
+            start_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 10, 0)),
+            end_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 12, 0)),
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def test_returns_current_reservations(self):
+        self._make_reservation()
+        response = self.client.get("/api/v1/reservations/current/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_past_excluded(self):
+        self._make_past()
+        response = self.client.get("/api/v1/reservations/current/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_400_missing_name(self):
+        response = self.client.get("/api/v1/reservations/current/", {"phone": "01012345678"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_400_missing_phone(self):
+        response = self.client.get("/api/v1/reservations/current/", {"name": "홍길동"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_pagination_structure(self):
+        self._make_reservation()
+        response = self.client.get("/api/v1/reservations/current/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        for key in ("count", "page", "page_size", "total_pages", "results"):
+            self.assertIn(key, response.data)
+
+    def test_only_own_reservations_returned(self):
+        self._make_reservation()
+        response = self.client.get("/api/v1/reservations/current/", {
+            "name": "다른사람", "phone": "01099999999"
+        })
+        self.assertEqual(response.data["count"], 0)
+
+
+class ReservationPastListViewTest(BaseTestCase):
+    """GET /api/v1/reservations/past/"""
+
+    def _make_past(self):
+        import datetime as dt
+        from django.utils import timezone as tz
+        return Reservation.objects.create(
+            space=self.space,
+            applicant_name="홍길동",
+            applicant_phone="01012345678",
+            team=self.base_team,
+            leader_phone="01098765432",
+            headcount=5,
+            purpose="과거 모임",
+            start_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 10, 0)),
+            end_datetime=tz.make_aware(dt.datetime(2020, 1, 1, 12, 0)),
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def test_returns_past_reservations(self):
+        self._make_past()
+        response = self.client.get("/api/v1/reservations/past/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_current_excluded(self):
+        self._make_reservation()
+        response = self.client.get("/api/v1/reservations/past/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 0)
+
+    def test_400_missing_name(self):
+        response = self.client.get("/api/v1/reservations/past/", {"phone": "01012345678"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_400_missing_phone(self):
+        response = self.client.get("/api/v1/reservations/past/", {"name": "홍길동"})
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_pagination_structure(self):
+        self._make_past()
+        response = self.client.get("/api/v1/reservations/past/", {
+            "name": "홍길동", "phone": "01012345678"
+        })
+        for key in ("count", "page", "page_size", "total_pages", "results"):
+            self.assertIn(key, response.data)
