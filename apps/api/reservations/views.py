@@ -1,7 +1,9 @@
 import datetime
 import io
+from math import ceil
 
 from django.contrib.auth import authenticate
+from django.db.models import Q
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, inline_serializer
@@ -182,13 +184,17 @@ class ReservationListCreateView(APIView):
                 {"error": "validation_error", "message": "이름과 연락처를 입력해주세요."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        reservations = Reservation.objects.filter(
-            applicant_name=query_serializer.validated_data["name"],
-            applicant_phone=query_serializer.validated_data["phone"],
-            is_deleted=False,
-        ).select_related("space__building")
-        serializer = ReservationSerializer(reservations, many=True)
-        return Response(serializer.data)
+        qs = (
+            Reservation.objects
+            .filter(
+                applicant_name=query_serializer.validated_data["name"],
+                applicant_phone=query_serializer.validated_data["phone"],
+                is_deleted=False,
+            )
+            .select_related("space__building")
+            .order_by("-start_datetime")
+        )
+        return Response(_paginate(qs, request))
 
     @extend_schema(
         request=ReservationCreateSerializer,
@@ -214,7 +220,8 @@ class ReservationListCreateView(APIView):
     )
     def post(self, request):
         serializer = ReservationCreateSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
+        if not serializer.is_valid():
+            return _admin_validation_error(serializer.errors)
         reservation = serializer.save()
         return Response(
             ReservationSerializer(reservation).data,
@@ -324,43 +331,79 @@ class AdminReservationListView(APIView):
 
     @extend_schema(
         parameters=[
-            OpenApiParameter(name="date",   type=str, required=False, description="날짜 필터 (예: 2026-04-01)"),
-            OpenApiParameter(name="status", type=str, required=False, description="상태 필터 (confirmed / rejected / cancelled / pending)"),
+            OpenApiParameter(name="status",      type=str, required=False, description="상태 필터 (confirmed / rejected / cancelled / pending)"),
+            OpenApiParameter(name="from_date",   type=str, required=False, description="시작일 필터 (예: 2026-04-01)"),
+            OpenApiParameter(name="to_date",     type=str, required=False, description="종료일 필터 (예: 2026-04-30)"),
+            OpenApiParameter(name="space_id",    type=int, required=False, description="공간 ID 필터"),
+            OpenApiParameter(name="building_id", type=int, required=False, description="건물 ID 필터"),
+            OpenApiParameter(name="search",      type=str, required=False, description="신청자명 또는 연락처 검색"),
+            OpenApiParameter(name="ordering",    type=str, required=False, description="정렬 (start_datetime / -start_datetime)"),
+            OpenApiParameter(name="page",        type=int, required=False, description="페이지 번호 (기본 1)"),
+            OpenApiParameter(name="page_size",   type=int, required=False, description="페이지 크기 (기본 20, 최대 100)"),
         ],
         responses={
-            200: ReservationSerializer(many=True),
-            400: OpenApiResponse(
-                response=inline_serializer("AdminReservationListErrorResponse", fields={
-                    "error": serializers.CharField(),
-                    "message": serializers.CharField(),
-                }),
-                description="date 파라미터 형식이 올바르지 않은 경우 (예: `abc`) — `validation_error`",
-            ),
-            401: OpenApiResponse(
-                response=inline_serializer("AdminReservationListUnauthorizedResponse", fields={
-                    "detail": serializers.CharField(),
-                }),
-                description="Authorization 토큰이 없거나 유효하지 않은 경우",
-            ),
+            200: OpenApiResponse(description="페이징된 예약 목록 { count, page, page_size, total_pages, results }"),
+            400: OpenApiResponse(description="날짜 / ID 형식 오류 — `validation_error`"),
+            401: OpenApiResponse(description="인증 실패"),
         },
     )
     def get(self, request):
-        qs = Reservation.objects.filter(is_deleted=False).select_related("space__building")
-        date = request.query_params.get("date")
-        status_filter = request.query_params.get("status")
-        if date:
-            try:
-                datetime.date.fromisoformat(date)
-            except ValueError:
-                return Response(
-                    {"error": "validation_error", "message": "날짜 형식이 올바르지 않습니다. (예: 2026-04-01)"},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-            qs = qs.filter(start_datetime__date=date)
-        if status_filter:
-            qs = qs.filter(status=status_filter)
-        serializer = ReservationSerializer(qs, many=True)
-        return Response(serializer.data)
+        qs, err = _build_admin_reservation_qs(request.query_params)
+        if err:
+            return err
+        return Response(_paginate(qs, request))
+
+
+class AdminReservationCurrentListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="status",      type=str, required=False),
+            OpenApiParameter(name="from_date",   type=str, required=False),
+            OpenApiParameter(name="to_date",     type=str, required=False),
+            OpenApiParameter(name="space_id",    type=int, required=False),
+            OpenApiParameter(name="building_id", type=int, required=False),
+            OpenApiParameter(name="search",      type=str, required=False),
+            OpenApiParameter(name="ordering",    type=str, required=False, description="기본: start_datetime (ASC)"),
+            OpenApiParameter(name="page",        type=int, required=False),
+            OpenApiParameter(name="page_size",   type=int, required=False),
+        ],
+        responses={200: OpenApiResponse(description="현재 예약 목록 (end_datetime >= now)")},
+    )
+    def get(self, request):
+        params = request.query_params.copy()
+        params.setdefault("ordering", "start_datetime")
+        qs, err = _build_admin_reservation_qs(params)
+        if err:
+            return err
+        qs = qs.filter(end_datetime__gte=timezone.now())
+        return Response(_paginate(qs, request))
+
+
+class AdminReservationPastListView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="status",      type=str, required=False),
+            OpenApiParameter(name="from_date",   type=str, required=False),
+            OpenApiParameter(name="to_date",     type=str, required=False),
+            OpenApiParameter(name="space_id",    type=int, required=False),
+            OpenApiParameter(name="building_id", type=int, required=False),
+            OpenApiParameter(name="search",      type=str, required=False),
+            OpenApiParameter(name="ordering",    type=str, required=False, description="기본: -start_datetime (DESC)"),
+            OpenApiParameter(name="page",        type=int, required=False),
+            OpenApiParameter(name="page_size",   type=int, required=False),
+        ],
+        responses={200: OpenApiResponse(description="지난 예약 목록 (end_datetime < now)")},
+    )
+    def get(self, request):
+        qs, err = _build_admin_reservation_qs(request.query_params)
+        if err:
+            return err
+        qs = qs.filter(end_datetime__lt=timezone.now())
+        return Response(_paginate(qs, request))
 
 
 class AdminReservationDeleteView(APIView):
@@ -464,7 +507,7 @@ class SpaceReservationListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            Space.objects.get(pk=pk)
+            Space.objects.get(pk=pk, is_active=True)
         except Space.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "공간을 찾을 수 없습니다."},
@@ -478,6 +521,68 @@ class SpaceReservationListView(APIView):
         ).order_by("start_datetime")
         serializer = SpaceOccupiedSlotSerializer(reservations, many=True)
         return Response(serializer.data)
+
+
+class ReservationCurrentListView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="name",      type=str, required=True,  description="신청자 이름"),
+            OpenApiParameter(name="phone",     type=str, required=True,  description="신청자 연락처"),
+            OpenApiParameter(name="page",      type=int, required=False, description="페이지 번호 (기본 1)"),
+            OpenApiParameter(name="page_size", type=int, required=False, description="페이지 크기 (기본 20)"),
+        ],
+        responses={200: OpenApiResponse(description="현재 예약 목록 (end_datetime >= now)")},
+    )
+    def get(self, request):
+        query_serializer = ReservationQuerySerializer(data=request.query_params)
+        if not query_serializer.is_valid():
+            return Response(
+                {"error": "validation_error", "message": "이름과 연락처를 입력해주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = (
+            Reservation.objects
+            .filter(
+                applicant_name=query_serializer.validated_data["name"],
+                applicant_phone=query_serializer.validated_data["phone"],
+                is_deleted=False,
+                end_datetime__gte=timezone.now(),
+            )
+            .select_related("space__building")
+            .order_by("start_datetime")
+        )
+        return Response(_paginate(qs, request))
+
+
+class ReservationPastListView(APIView):
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(name="name",      type=str, required=True,  description="신청자 이름"),
+            OpenApiParameter(name="phone",     type=str, required=True,  description="신청자 연락처"),
+            OpenApiParameter(name="page",      type=int, required=False, description="페이지 번호 (기본 1)"),
+            OpenApiParameter(name="page_size", type=int, required=False, description="페이지 크기 (기본 20)"),
+        ],
+        responses={200: OpenApiResponse(description="지난 예약 목록 (end_datetime < now)")},
+    )
+    def get(self, request):
+        query_serializer = ReservationQuerySerializer(data=request.query_params)
+        if not query_serializer.is_valid():
+            return Response(
+                {"error": "validation_error", "message": "이름과 연락처를 입력해주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = (
+            Reservation.objects
+            .filter(
+                applicant_name=query_serializer.validated_data["name"],
+                applicant_phone=query_serializer.validated_data["phone"],
+                is_deleted=False,
+                end_datetime__lt=timezone.now(),
+            )
+            .select_related("space__building")
+            .order_by("-start_datetime")
+        )
+        return Response(_paginate(qs, request))
 
 
 class ReservationPublicCancelView(APIView):
@@ -528,7 +633,7 @@ class ReservationPublicCancelView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
         except Reservation.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
@@ -589,7 +694,7 @@ class AdminReservationCancelView(APIView):
     )
     def post(self, request, pk):
         try:
-            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
         except Reservation.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
@@ -621,6 +726,79 @@ def _admin_validation_error(errors):
         msg = str(msgs[0]) if field == "non_field_errors" else f"{field}: {msgs[0]}"
         break
     return Response({"error": "validation_error", "message": msg}, status=status.HTTP_400_BAD_REQUEST)
+
+
+def _build_admin_reservation_qs(params):
+    """Admin 예약 목록 공통 필터 + 정렬 적용 QuerySet 반환."""
+    qs = (
+        Reservation.objects
+        .filter(is_deleted=False)
+        .select_related("space__building", "team")
+    )
+    if status_val := params.get("status"):
+        qs = qs.filter(status=status_val)
+    if from_date := params.get("from_date"):
+        try:
+            datetime.date.fromisoformat(from_date)
+        except ValueError:
+            return None, Response(
+                {"error": "validation_error", "message": "from_date 형식이 올바르지 않습니다. (예: 2026-04-01)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = qs.filter(start_datetime__date__gte=from_date)
+    if to_date := params.get("to_date"):
+        try:
+            datetime.date.fromisoformat(to_date)
+        except ValueError:
+            return None, Response(
+                {"error": "validation_error", "message": "to_date 형식이 올바르지 않습니다. (예: 2026-04-01)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        qs = qs.filter(start_datetime__date__lte=to_date)
+    if space_id := params.get("space_id"):
+        try:
+            qs = qs.filter(space_id=int(space_id))
+        except (ValueError, TypeError):
+            return None, Response(
+                {"error": "validation_error", "message": "space_id는 정수여야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    if building_id := params.get("building_id"):
+        try:
+            qs = qs.filter(space__building_id=int(building_id))
+        except (ValueError, TypeError):
+            return None, Response(
+                {"error": "validation_error", "message": "building_id는 정수여야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+    if search := params.get("search"):
+        qs = qs.filter(
+            Q(applicant_name__icontains=search) | Q(applicant_phone__icontains=search)
+        )
+    ordering = params.get("ordering", "-start_datetime")
+    if ordering not in ("start_datetime", "-start_datetime"):
+        ordering = "-start_datetime"
+    return qs.order_by(ordering), None
+
+
+def _paginate(qs, request):
+    """QuerySet을 페이징하여 { count, page, page_size, total_pages, results } 반환."""
+    try:
+        page      = max(1, int(request.query_params.get("page", 1)))
+        page_size = min(100, max(1, int(request.query_params.get("page_size", 20))))
+    except (ValueError, TypeError):
+        page, page_size = 1, 20
+
+    total   = qs.count()
+    offset  = (page - 1) * page_size
+    results = qs[offset: offset + page_size]
+    return {
+        "count":       total,
+        "page":        page,
+        "page_size":   page_size,
+        "total_pages": ceil(total / page_size) if total else 1,
+        "results":     ReservationSerializer(results, many=True).data,
+    }
 
 
 class AdminTeamListCreateView(APIView):
@@ -810,7 +988,8 @@ class AdminReservationStatusView(APIView):
             )
 
         ser = AdminReservationStatusSerializer(data=request.data)
-        ser.is_valid(raise_exception=True)
+        if not ser.is_valid():
+            return _admin_validation_error(ser.errors)
         new_status = ser.validated_data["status"]
 
         if new_status == Reservation.Status.CONFIRMED and reservation.has_conflict():
