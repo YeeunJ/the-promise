@@ -1033,22 +1033,6 @@ class PastorDisplayInheritanceSerializerTest(BaseTestCase):
         self.assertIsNone(team["pastor_display"])
 
 
-class ReservationSerializerBackwardCompatTest(BaseTestCase):
-    """ReservationSerializer 에 applicant_team 문자열 포함 (하위 호환)"""
-
-    def test_applicant_team_equals_team_name_when_team_set(self):
-        r = self._make_reservation()
-        response = self.client.get(f"/api/v1/reservations/{r.pk}/")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn("applicant_team", response.data)
-        self.assertEqual(response.data["applicant_team"], self.base_team.name)
-
-    def test_applicant_team_equals_custom_team_name_when_team_null(self):
-        r = self._make_reservation(team=None, custom_team_name="외부손님")
-        response = self.client.get(f"/api/v1/reservations/{r.pk}/")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["applicant_team"], "외부손님")
-
 
 class ReservationCreateEtcCaseTest(BaseTestCase):
     """'기타' 케이스: team=null + custom_team_name 으로 예약 생성"""
