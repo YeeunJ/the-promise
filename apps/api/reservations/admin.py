@@ -36,4 +36,4 @@ class SpaceAdmin(admin.ModelAdmin):
 class ReservationAdmin(admin.ModelAdmin):
     list_display  = ["id", "space", "applicant_name", "team", "status", "start_datetime", "end_datetime"]
     list_filter   = ["status", "space__building"]
-    search_fields = ["applicant_name", "applicant_phone", "custom_team_name"]
+    search_fields = ["applicant_name", "applicant_phone", "team__name", "custom_team_name"]
