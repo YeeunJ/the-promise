@@ -464,7 +464,7 @@ class SpaceReservationListView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            Space.objects.get(pk=pk)
+            Space.objects.get(pk=pk, is_active=True)
         except Space.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "공간을 찾을 수 없습니다."},
@@ -528,7 +528,7 @@ class ReservationPublicCancelView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
         try:
-            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
         except Reservation.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
@@ -589,7 +589,7 @@ class AdminReservationCancelView(APIView):
     )
     def post(self, request, pk):
         try:
-            reservation = Reservation.objects.get(pk=pk, is_deleted=False)
+            reservation = Reservation.objects.select_related("space__building").get(pk=pk, is_deleted=False)
         except Reservation.DoesNotExist:
             return Response(
                 {"error": "not_found", "message": "예약을 찾을 수 없습니다."},
