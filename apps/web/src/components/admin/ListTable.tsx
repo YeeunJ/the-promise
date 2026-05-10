@@ -7,6 +7,7 @@ import { StatusBadge } from '../ui/StatusBadge';
 interface ListTableProps {
   reservations: Reservation[];
   onCancelRequest: (id: number) => void;
+  onDetailRequest: (id: number) => void;
 }
 
 function formatShortDate(isoString: string): string {
@@ -20,7 +21,7 @@ const COLUMN_HEADERS = [
   '날짜', '건물', '장소', '시간', '이름', '부서', '인원', '목적', '상태', '액션',
 ] as const;
 
-export function ListTable({ reservations, onCancelRequest }: ListTableProps): JSX.Element {
+export function ListTable({ reservations, onCancelRequest, onDetailRequest }: ListTableProps): JSX.Element {
   const sorted = [...reservations].sort(
     (a, b) => a.start_datetime.localeCompare(b.start_datetime),
   );
@@ -84,7 +85,7 @@ export function ListTable({ reservations, onCancelRequest }: ListTableProps): JS
                     {reservation.applicant_name}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    {reservation.applicant_team}
+                    {reservation.applicant_team || '-'}
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
                     {reservation.headcount}
@@ -96,18 +97,27 @@ export function ListTable({ reservations, onCancelRequest }: ListTableProps): JS
                     <StatusBadge status={reservation.status} />
                   </td>
                   <td className="px-3 py-2 whitespace-nowrap">
-                    <button
-                      type="button"
-                      disabled={!cancellable}
-                      onClick={() => onCancelRequest(reservation.id)}
-                      className={`text-xs px-2 py-1 rounded border ${
-                        cancellable
-                          ? 'text-[#DC2626] border-[#DC2626]/30 hover:bg-[#DC2626]/5 cursor-pointer'
-                          : 'text-gray-400 border-gray-200 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      취소하기
-                    </button>
+                    <div className="flex gap-1">
+                      <button
+                        type="button"
+                        onClick={() => onDetailRequest(reservation.id)}
+                        className="text-xs px-2 py-1 rounded border border-brand-primary/30 text-brand-primary hover:bg-brand-primary/5 cursor-pointer"
+                      >
+                        상세보기
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!cancellable}
+                        onClick={() => onCancelRequest(reservation.id)}
+                        className={`text-xs px-2 py-1 rounded border ${
+                          cancellable
+                            ? 'text-[#DC2626] border-[#DC2626]/30 hover:bg-[#DC2626]/5 cursor-pointer'
+                            : 'text-gray-400 border-gray-200 opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        취소하기
+                      </button>
+                    </div>
                   </td>
                 </tr>
               );

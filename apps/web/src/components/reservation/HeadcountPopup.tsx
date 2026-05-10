@@ -11,9 +11,13 @@ interface HeadcountPopupProps {
   value: number;
   onConfirm: (headcount: number) => void;
   completedSteps?: CompletedStep[];
+  globalStep?: number;
+  maxStep?: number;
+  stepLabels?: string[];
+  onStepNavigate?: (step: number) => void;
 }
 
-function HeadcountPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps }: HeadcountPopupProps): JSX.Element {
+function HeadcountPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps, globalStep, maxStep, stepLabels, onStepNavigate }: HeadcountPopupProps): JSX.Element {
   const [selected, setSelected] = useState<number>(value);
 
   useEffect(() => {
@@ -31,12 +35,15 @@ function HeadcountPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       onClose={onClose}
       onReset={onReset}
       title="인원 선택"
-      subtitle="3/5"
       onBack={onBack}
       onConfirm={handleConfirm}
       canConfirm={selected > 0}
       confirmLabel="다음"
       completedSteps={completedSteps}
+      globalStep={globalStep}
+      maxStep={maxStep}
+      stepLabels={stepLabels}
+      onStepNavigate={onStepNavigate}
     >
       <p className="text-base font-semibold text-black mb-4">인원을 선택해주세요</p>
       <div className="grid grid-cols-2 gap-3">

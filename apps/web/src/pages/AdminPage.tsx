@@ -10,6 +10,7 @@ import { CalendarSidePanel } from '../components/admin/CalendarSidePanel';
 import { ListFilterBar } from '../components/admin/ListFilterBar';
 import { ListTable } from '../components/admin/ListTable';
 import { CancelDialog } from '../components/admin/CancelDialog';
+import { ReservationDetailModal } from '../components/admin/ReservationDetailModal';
 import { Toast } from '../components/ui/Toast';
 
 type DatePreset = '1w' | '2w' | '1m' | 'custom';
@@ -43,6 +44,7 @@ function AdminPage(): JSX.Element {
   const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
+  const [detailTargetId, setDetailTargetId] = useState<number | null>(null);
 
   const [spaceFilter, setSpaceFilter] = useState<Set<number>>(new Set());
   const [datePreset, setDatePreset] = useState<DatePreset>('1w');
@@ -237,10 +239,10 @@ function AdminPage(): JSX.Element {
         {isLoading ? (
           viewMode === 'calendar' ? (
             <div className="flex gap-6">
-              <div className="flex-[0_0_50%] min-w-0">
+              <div className="flex-[0_0_40%] min-w-0">
                 <div className="animate-pulse bg-gray-200 rounded h-64" />
               </div>
-              <div className="flex-[0_0_50%] min-w-0 space-y-3">
+              <div className="flex-[0_0_60%] min-w-0 space-y-3">
                 <div className="animate-pulse bg-gray-200 rounded h-12" />
                 <div className="animate-pulse bg-gray-200 rounded h-12" />
                 <div className="animate-pulse bg-gray-200 rounded h-12" />
@@ -258,7 +260,7 @@ function AdminPage(): JSX.Element {
           <>
             {viewMode === 'calendar' && (
               <div className="flex gap-6">
-                <div className="flex-[0_0_50%] min-w-0">
+                <div className="flex-[0_0_40%] min-w-0">
                   <CalendarGrid
                     currentYear={currentYear}
                     currentMonth={currentMonth}
@@ -267,11 +269,12 @@ function AdminPage(): JSX.Element {
                     onDateSelect={setSelectedDate}
                   />
                 </div>
-                <div className="flex-[0_0_50%] min-w-0">
+                <div className="flex-[0_0_60%] min-w-0">
                   <CalendarSidePanel
                     selectedDate={selectedDate}
                     reservations={reservations}
                     onCancelRequest={handleCancelRequest}
+                    onDetailRequest={setDetailTargetId}
                   />
                 </div>
               </div>
@@ -294,6 +297,7 @@ function AdminPage(): JSX.Element {
                 <ListTable
                   reservations={filteredReservations}
                   onCancelRequest={handleCancelRequest}
+                  onDetailRequest={setDetailTargetId}
                 />
               </>
             )}
@@ -308,6 +312,11 @@ function AdminPage(): JSX.Element {
         onConfirm={handleCancelConfirm}
         onClose={() => setCancelTargetId(null)}
         isLoading={isCancelling}
+      />
+
+      <ReservationDetailModal
+        reservation={reservations.find((r) => r.id === detailTargetId) ?? null}
+        onClose={() => setDetailTargetId(null)}
       />
     </div>
   );

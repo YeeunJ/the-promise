@@ -17,12 +17,13 @@ interface DateTimePopupProps {
   value: TimeSlotValue;
   onConfirm: (value: TimeSlotValue) => void;
   completedSteps?: CompletedStep[];
+  globalStep?: number;
+  maxStep?: number;
+  stepLabels?: string[];
+  onStepNavigate?: (step: number) => void;
 }
 
-type InternalStep = 'date' | 'time';
-
-function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onConfirm, completedSteps }: DateTimePopupProps): JSX.Element {
-  const [step, setStep] = useState<InternalStep>('date');
+function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onConfirm, completedSteps, globalStep, maxStep, stepLabels, onStepNavigate }: DateTimePopupProps): JSX.Element {
   const [localValue, setLocalValue] = useState<TimeSlotValue>(value);
   const [slots, setSlots] = useState<string[]>([]);
   const [showAllSlots, setShowAllSlots] = useState(false);
@@ -31,7 +32,6 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
 
   const todayStr = useMemo(() => getKSTDateString(), []);
 
-  // DayPicker disabled 기준을 KST 날짜 자정으로 설정 (todayStr과 일관성 유지)
   const today = useMemo(() => {
     const [y, m, d] = todayStr.split('-').map(Number);
     return new Date(y, m - 1, d);
@@ -40,7 +40,6 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
   useEffect(() => {
     if (isOpen) {
       setLocalValue(value);
-      setStep(value.date ? 'time' : 'date');
       setShowAllSlots(false);
     }
     // Intentional: only re-sync on open.
@@ -55,17 +54,14 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
     }
   }, [localValue.date]);
 
-  // spaceId 변경 시 초기화
   const prevSpaceIdRef = useRef(spaceId);
   useEffect(() => {
     if (prevSpaceIdRef.current !== spaceId) {
       prevSpaceIdRef.current = spaceId;
       setLocalValue({ date: '', startTime: '', endTime: '' });
-      setStep('date');
     }
   }, [spaceId]);
 
-  // 점유 슬롯이 갱신되면 겹치는 선택을 초기화
   const localValueRef = useRef(localValue);
   localValueRef.current = localValue;
 
@@ -85,7 +81,6 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
     setLocalValue({ date: `${y}-${m}-${d}`, startTime: '', endTime: '' });
-    setStep('time');
   }
 
   function handleSlotClick(slot: string) {
@@ -102,7 +97,6 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
   }
 
   function isPast(slot: string): boolean {
-    // 오늘 날짜의 슬롯만 과거 여부 확인 (미래 날짜는 항상 선택 가능)
     if (localValue.date !== todayStr) return false;
     return new Date(slot).getTime() <= Date.now();
   }
@@ -137,18 +131,12 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
   function isSlotDisabled(slot: string): boolean {
     if (isSlotOccupied(slot, occupiedSlots)) return true;
     if (isPast(slot)) return true;
-    // 24:00 슬롯은 종료 시간으로만 선택 가능 (시작 시간 선택 단계에서는 비활성화)
     if (isMidnightNextDay(slot) && (!localValue.startTime || Boolean(localValue.endTime))) return true;
     return Boolean(localValue.startTime && !localValue.endTime && slot < localValue.startTime);
   }
 
   function handleConfirm() {
     if (canConfirm) onConfirm(localValue);
-  }
-
-  function handleInternalBack() {
-    if (step === 'time') { setStep('date'); return; }
-    onBack?.();
   }
 
   const canConfirm = localValue.startTime !== '' && localValue.endTime !== '';
@@ -159,8 +147,6 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
         return t >= DEFAULT_START_TIME && t <= DEFAULT_END_TIME;
       });
 
-  const subtitleMap: Record<InternalStep, string> = { date: '1/2', time: '2/2' };
-
   const selectedDate = localValue.date ? new Date(localValue.date + 'T00:00:00') : undefined;
 
   return (
@@ -169,50 +155,32 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
       onClose={onClose}
       onReset={onReset}
       title="날짜 및 시간"
-      subtitle={subtitleMap[step]}
-      onBack={handleInternalBack}
-      onConfirm={step === 'time' ? handleConfirm : undefined}
-      canConfirm={step === 'time' ? canConfirm : false}
+      onBack={onBack}
+      onConfirm={handleConfirm}
+      canConfirm={canConfirm}
       confirmLabel="다음"
       completedSteps={completedSteps}
+      globalStep={globalStep}
+      maxStep={maxStep}
+      stepLabels={stepLabels}
+      onStepNavigate={onStepNavigate}
     >
-      {/* 요약 배지 */}
-      {step === 'time' && localValue.date && (
-        <div className="mb-4 rounded-xl bg-gray-50 border border-[#E5E7EB] px-4 py-3">
-          <div className="flex items-center gap-2 text-sm">
-            <span className="text-brand-accent font-medium w-14 flex-shrink-0">날짜</span>
-            <span className="text-black font-semibold">{localValue.date}</span>
-          </div>
+      <div className="flex gap-4">
+        {/* 왼쪽: 달력 */}
+        <div className="flex-shrink-0">
+          <p className="text-sm font-semibold text-black mb-2">날짜 선택</p>
+          <DayPicker
+            mode="single"
+            selected={selectedDate}
+            onSelect={handleDaySelect}
+            disabled={{ before: today }}
+          />
         </div>
-      )}
 
-      {/* step: date — 달력 */}
-      {step === 'date' && (
-        <div>
-          <p className="text-base font-semibold text-black mb-4">날짜를 선택해주세요</p>
-          <div className="flex justify-center">
-            <DayPicker
-              mode="single"
-              selected={selectedDate}
-              onSelect={handleDaySelect}
-              disabled={{ before: today }}
-            />
-          </div>
-        </div>
-      )}
-
-      {/* step: time — 시간 슬롯 선택 */}
-      {step === 'time' && (
-        <div>
-          <p className="text-base font-semibold text-black mb-2">시간을 선택해주세요</p>
-          <div className="flex items-center mb-3">
-            <p className="text-xs text-gray-500">
-              {!localValue.startTime && '시작 시간을 선택해주세요'}
-              {localValue.startTime && !localValue.endTime && '종료 시간을 선택해주세요'}
-              {localValue.startTime && localValue.endTime && (
-                <>{formatTime(localValue.startTime)} ~ {formatTimeSlotLabel(localValue.endTime, localValue.date)}</>
-              )}
-            </p>
+        {/* 오른쪽: 시간 슬롯 */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center mb-2 gap-2">
+            <p className="text-sm font-semibold text-black">시간 선택</p>
             <div className="ml-auto flex items-center gap-2">
               {localValue.startTime && (
                 <button
@@ -228,47 +196,48 @@ function DateTimePopup({ isOpen, onClose, onBack, onReset, spaceId, value, onCon
                 onClick={() => setShowAllSlots((prev) => !prev)}
                 className="text-xs text-brand-primary underline whitespace-nowrap"
               >
-                {showAllSlots ? '기본시간 보기' : '전체시간 보기'}
+                {showAllSlots ? '기본' : '전체'}
               </button>
             </div>
           </div>
 
-          {slotsError && (
-            <p className="text-sm text-red-500 mb-2">{slotsError}</p>
-          )}
+          <p className="text-xs text-gray-500 mb-2">
+            {!localValue.date && '날짜를 먼저 선택해주세요'}
+            {localValue.date && !localValue.startTime && '시작 시간을 선택해주세요'}
+            {localValue.startTime && !localValue.endTime && '종료 시간을 선택해주세요'}
+            {localValue.startTime && localValue.endTime && (
+              <>{formatTime(localValue.startTime)} ~ {formatTimeSlotLabel(localValue.endTime, localValue.date)}</>
+            )}
+          </p>
 
-          {isLoadingSlots && (
-            <p className="text-sm text-gray-400 mb-2">예약 현황을 불러오는 중...</p>
-          )}
+          {slotsError && <p className="text-sm text-red-500 mb-2">{slotsError}</p>}
+          {isLoadingSlots && <p className="text-sm text-gray-400 mb-2">예약 현황을 불러오는 중...</p>}
 
-          {slots.length === 0
-            ? <p className="text-sm text-gray-400">날짜를 먼저 선택해주세요</p>
-            : (
-              <>
-                <div className="grid grid-cols-4 gap-1 sm:grid-cols-6">
-                  {visibleSlots.map((slot) => (
-                    <button
-                      key={slot}
-                      type="button"
-                      disabled={isSlotDisabled(slot)}
-                      onClick={() => handleSlotClick(slot)}
-                      className={getSlotStyle(slot)}
-                    >
-                      {formatTimeSlotLabel(slot, localValue.date)}
-                    </button>
-                  ))}
+          {slots.length > 0 && (
+            <>
+              <div className="grid grid-cols-3 gap-1 max-h-64 overflow-y-auto">
+                {visibleSlots.map((slot) => (
+                  <button
+                    key={slot}
+                    type="button"
+                    disabled={isSlotDisabled(slot)}
+                    onClick={() => handleSlotClick(slot)}
+                    className={getSlotStyle(slot)}
+                  >
+                    {formatTimeSlotLabel(slot, localValue.date)}
+                  </button>
+                ))}
+              </div>
+              {occupiedSlots.length > 0 && (
+                <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
+                  <span className="inline-block w-4 h-4 rounded bg-gray-200 border border-gray-200 line-through text-center text-[10px] leading-4">X</span>
+                  <span>예약됨</span>
                 </div>
-                {occupiedSlots.length > 0 && (
-                  <div className="flex items-center gap-2 mt-3 text-xs text-gray-500">
-                    <span className="inline-block w-4 h-4 rounded bg-gray-200 border border-gray-200 line-through text-center text-[10px] leading-4">X</span>
-                    <span>예약됨</span>
-                  </div>
-                )}
-              </>
-            )
-          }
+              )}
+            </>
+          )}
         </div>
-      )}
+      </div>
     </StepPopup>
   );
 }

@@ -39,18 +39,33 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
   const [isReviewing, setIsReviewing] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [maxReachedStep, setMaxReachedStep] = useState(1);
+
+  function getGlobalStep(popup: Exclude<ActivePopup, null>): number {
+    return POPUP_SEQUENCE.indexOf(popup) + 1;
+  }
 
   function goNext() {
     if (activePopup === null) return;
     const idx = POPUP_SEQUENCE.indexOf(activePopup);
     const next = idx + 1;
-    setActivePopup(next < POPUP_SEQUENCE.length ? POPUP_SEQUENCE[next] : null);
+    if (next < POPUP_SEQUENCE.length) {
+      setMaxReachedStep((prev) => Math.max(prev, next + 1));
+      setActivePopup(POPUP_SEQUENCE[next]);
+    } else {
+      setActivePopup(null);
+    }
   }
 
   function goBack() {
     if (activePopup === null) return;
     const idx = POPUP_SEQUENCE.indexOf(activePopup);
     setActivePopup(idx > 0 ? POPUP_SEQUENCE[idx - 1] : null);
+  }
+
+  function handleStepNavigate(step: number) {
+    const target = POPUP_SEQUENCE[step - 1];
+    if (target) setActivePopup(target);
   }
 
   function resolveEditTarget(errorMessage: string | null): Exclude<ActivePopup, null> {
@@ -64,6 +79,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
 
   function startFlow() {
     setSubmitError(null);
+    setMaxReachedStep(1);
     setActivePopup('applicant');
   }
 
@@ -75,6 +91,7 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
     setPurpose('');
     setSubmitError(null);
     setIsReviewing(false);
+    setMaxReachedStep(1);
     setActivePopup(null);
   }
 
@@ -88,7 +105,8 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
       space: spaceSelection.id,
       applicant_name: applicant.name,
       applicant_phone: applicant.phone,
-      applicant_team: `${applicant.departmentName} > ${applicant.teamName}`,
+      team: applicant.teamId,
+      custom_team_name: applicant.customTeamName ?? '',
       leader_phone: applicant.pastorDisplay || '직접 문의',
       headcount,
       purpose: purposeVal.trim(),
@@ -191,6 +209,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={applicant}
         onConfirm={(data) => { setApplicant(data); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('applicant')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <SpacePopup
         isOpen={activePopup === 'space'}
@@ -201,6 +223,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         previousSelection={spaceSelection}
         onSelected={(sel) => { setSpaceSelection(sel); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('space')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <HeadcountPopup
         isOpen={activePopup === 'headcount'}
@@ -210,6 +236,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={headcount}
         onConfirm={(val) => { setHeadcount(val); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('headcount')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <DateTimePopup
         isOpen={activePopup === 'datetime'}
@@ -220,6 +250,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={timeSlot}
         onConfirm={(val) => { setTimeSlot(val); goNext(); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('datetime')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
       <PurposePopup
         isOpen={activePopup === 'purpose'}
@@ -229,6 +263,10 @@ function ReservationForm({ onSubmitSuccess }: ReservationFormProps): JSX.Element
         value={purpose}
         onConfirm={(val) => { setPurpose(val); setActivePopup(null); setIsReviewing(true); }}
         completedSteps={completedSteps}
+        globalStep={getGlobalStep('purpose')}
+        maxStep={maxReachedStep}
+        stepLabels={STEP_LABELS}
+        onStepNavigate={handleStepNavigate}
       />
     </>
   );
@@ -269,7 +307,14 @@ function ReviewPanel({
 
       <div className="px-5 py-4 space-y-3">
         <ReviewRow label="신청자" value={`${applicant.name} (${applicant.phone})`} />
-        <ReviewRow label="단체" value={`${applicant.departmentName} > ${applicant.teamName}`} />
+        <ReviewRow
+          label="단체"
+          value={
+            applicant.teamId === null
+              ? `${applicant.departmentName} > ${applicant.customTeamName ?? ''}`
+              : `${applicant.departmentName} > ${applicant.teamName}`
+          }
+        />
         <ReviewRow label="장소" value={spaceLabel} />
         <ReviewRow label="인원" value={`${headcount}명`} />
         <ReviewRow label="일시" value={datetimeLabel} />

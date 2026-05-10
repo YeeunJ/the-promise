@@ -11,9 +11,13 @@ interface PurposePopupProps {
   value: string;
   onConfirm: (purpose: string) => void;
   completedSteps?: CompletedStep[];
+  globalStep?: number;
+  maxStep?: number;
+  stepLabels?: string[];
+  onStepNavigate?: (step: number) => void;
 }
 
-function PurposePopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps }: PurposePopupProps): JSX.Element {
+function PurposePopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps, globalStep, maxStep, stepLabels, onStepNavigate }: PurposePopupProps): JSX.Element {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [customText, setCustomText] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -74,12 +78,15 @@ function PurposePopup({ isOpen, onClose, onBack, onReset, value, onConfirm, comp
       onClose={onClose}
       onReset={onReset}
       title="사용 목적"
-      subtitle="5/5"
       onBack={onBack}
       onConfirm={handleConfirmClick}
       canConfirm={canConfirm}
       confirmLabel="완료"
       completedSteps={completedSteps}
+      globalStep={globalStep}
+      maxStep={maxStep}
+      stepLabels={stepLabels}
+      onStepNavigate={onStepNavigate}
     >
       <div>
         <p className="text-base font-semibold text-black mb-4">사용 목적을 선택해주세요</p>

@@ -20,9 +20,13 @@ interface SpacePopupProps {
   previousSelection: SpaceSelection | null;
   onSelected: (selection: SpaceSelection) => void;
   completedSteps?: CompletedStep[];
+  globalStep?: number;
+  maxStep?: number;
+  stepLabels?: string[];
+  onStepNavigate?: (step: number) => void;
 }
 
-function SpacePopup({ isOpen, onClose, onBack, onReset, value, previousSelection, onSelected, completedSteps }: SpacePopupProps): JSX.Element {
+function SpacePopup({ isOpen, onClose, onBack, onReset, value, previousSelection, onSelected, completedSteps, globalStep, maxStep, stepLabels, onStepNavigate }: SpacePopupProps): JSX.Element {
   const [selectedSpaceId, setSelectedSpaceId] = useState<number | null>(value);
   const [pendingSpace, setPendingSpace] = useState<Space | null>(null);
 
@@ -61,12 +65,15 @@ function SpacePopup({ isOpen, onClose, onBack, onReset, value, previousSelection
       onClose={onClose}
       onReset={onReset}
       title="장소 선택"
-      subtitle="2/5"
       onBack={onBack}
       onConfirm={handleConfirm}
       canConfirm={canConfirm}
       confirmLabel="다음"
       completedSteps={completedSteps}
+      globalStep={globalStep}
+      maxStep={maxStep}
+      stepLabels={stepLabels}
+      onStepNavigate={onStepNavigate}
     >
       <SpaceSelector
         value={selectedSpaceId}

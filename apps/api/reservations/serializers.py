@@ -4,16 +4,37 @@ from rest_framework import serializers
 from .models import Building, Department, Pastor, Space, Reservation, Team
 
 
-class PastorSerializer(serializers.ModelSerializer):
-    class Meta:
-        model  = Pastor
-        fields = ["id", "name", "title"]
-
-
 class TeamSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Team
         fields = ["id", "name", "leader_phone"]
+
+
+class PastorSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Pastor
+        fields = ["id", "name", "title"]
+
+
+class TeamNestedSerializer(serializers.ModelSerializer):
+    pastor = PastorSerializer(read_only=True)
+    pastor_display = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Team
+        fields = ["id", "name", "pastor", "pastor_display"]
+
+    def get_pastor_display(self, obj: Team) -> str | None:
+        return obj.get_pastor_display()
+
+
+class DepartmentSerializer(serializers.ModelSerializer):
+    pastor = PastorSerializer(read_only=True)
+    teams = TeamNestedSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Department
+        fields = ["id", "name", "display_order", "pastor", "teams"]
 
 
 class BuildingSerializer(serializers.ModelSerializer):

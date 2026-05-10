@@ -22,6 +22,8 @@ function makeReservation(overrides: Partial<Reservation> = {}): Reservation {
     applicant_name: '홍길동',
     applicant_phone: '010-1234-5678',
     applicant_team: '청년부',
+    team: null,
+    custom_team_name: null,
     leader_phone: '010-8765-4321',
     headcount: 10,
     purpose: '정기모임',

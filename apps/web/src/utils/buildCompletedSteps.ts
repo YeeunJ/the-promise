@@ -27,9 +27,13 @@ export function buildCompletedSteps({
   const steps: CompletedStep[] = [];
 
   if (applicant) {
+    const teamLabel =
+      applicant.teamId === null
+        ? (applicant.customTeamName ?? '')
+        : applicant.teamName;
     steps.push({
       label: '신청자',
-      value: `${applicant.name} · ${applicant.departmentName} ${applicant.teamName}`,
+      value: `${applicant.name} · ${applicant.departmentName} ${teamLabel}`,
     });
   }
 

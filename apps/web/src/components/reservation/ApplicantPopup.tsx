@@ -9,10 +9,11 @@ import type { DepartmentSelection } from './DepartmentSelector';
 export interface ApplicantData {
   name: string;
   phone: string;
-  departmentId: string;
+  departmentId: number;
   departmentName: string;
-  teamId: string;
+  teamId: number | null;
   teamName: string;
+  customTeamName: string | null;
   pastorDisplay: string;
 }
 
@@ -24,6 +25,10 @@ interface ApplicantPopupProps {
   value: ApplicantData | null;
   onConfirm: (data: ApplicantData) => void;
   completedSteps?: CompletedStep[];
+  globalStep?: number;
+  maxStep?: number;
+  stepLabels?: string[];
+  onStepNavigate?: (step: number) => void;
 }
 
 type InternalStep = 'name' | 'phone' | 'team';
@@ -34,11 +39,12 @@ function toDepartmentSelection(data: ApplicantData): DepartmentSelection {
     departmentName: data.departmentName,
     teamId: data.teamId,
     teamName: data.teamName,
+    customTeamName: data.customTeamName,
     pastorDisplay: data.pastorDisplay,
   };
 }
 
-function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps }: ApplicantPopupProps): JSX.Element {
+function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, completedSteps, globalStep, maxStep, stepLabels, onStepNavigate }: ApplicantPopupProps): JSX.Element {
   const [step, setStep] = useState<InternalStep>('name');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -57,7 +63,7 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
   useEffect(() => {
     if (isOpen) {
       setName(value?.name ?? '');
-      setPhone(value?.phone ?? '');
+      setPhone(value?.phone ?? '010-');
       setDepartment(
         value ? toDepartmentSelection(value) : null,
       );
@@ -96,7 +102,10 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
 
   // --- step: team ---
   function handleTeamConfirm() {
-    if (!department?.teamId) return;
+    if (!department) return;
+    const isEtc = department.departmentName === '기타';
+    if (!isEtc && !department.teamId) return;
+    if (isEtc && !department.customTeamName?.trim()) return;
     onConfirm({
       name: name.trim(),
       phone,
@@ -104,6 +113,7 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       departmentName: department.departmentName,
       teamId: department.teamId,
       teamName: department.teamName,
+      customTeamName: department.customTeamName,
       pastorDisplay: department.pastorDisplay,
     });
   }
@@ -120,8 +130,6 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
     };
   }
 
-  const subtitleMap: Record<InternalStep, string> = { name: '1/3', phone: '2/3', team: '3/3' };
-
   const localCompletedSteps: CompletedStep[] = [];
   if (step !== 'name') {
     localCompletedSteps.push({ label: '이름', value: name });
@@ -136,7 +144,6 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       onClose={onClose}
       onReset={onReset}
       title="신청자 정보"
-      subtitle={subtitleMap[step]}
       onBack={step === 'name' ? onBack : handleInternalBack}
       onConfirm={
         step === 'name' ? handleNameNext
@@ -146,10 +153,16 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
       canConfirm={
         step === 'name' ? name.trim() !== ''
         : step === 'phone' ? phone.trim() !== ''
-        : Boolean(department?.teamId)
+        : department?.departmentName === '기타'
+          ? Boolean(department?.customTeamName?.trim())
+          : Boolean(department?.teamId)
       }
       confirmLabel="다음"
       completedSteps={[...(completedSteps ?? []), ...localCompletedSteps]}
+      globalStep={globalStep}
+      maxStep={maxStep}
+      stepLabels={stepLabels}
+      onStepNavigate={onStepNavigate}
     >
       {/* step: name */}
       {step === 'name' && (
@@ -179,7 +192,7 @@ function ApplicantPopup({ isOpen, onClose, onBack, onReset, value, onConfirm, co
             type="text"
             inputMode="numeric"
             value={phone}
-            onChange={(e) => { setPhone(normalizePhone(e.target.value)); setPhoneError(''); }}
+            onChange={(e) => { const n = normalizePhone(e.target.value); setPhone(n.startsWith('010') ? n : '010-'); setPhoneError(''); }}
             onKeyDown={handleKeyDown(handlePhoneNext)}
             placeholder="010-0000-0000"
             className={`w-full rounded-xl border px-4 py-3 text-base focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${

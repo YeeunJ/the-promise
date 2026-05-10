@@ -9,6 +9,7 @@ interface CalendarSidePanelProps {
   selectedDate: string | null;
   reservations: Reservation[];
   onCancelRequest: (id: number) => void;
+  onDetailRequest: (id: number) => void;
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -41,6 +42,7 @@ export function CalendarSidePanel({
   selectedDate,
   reservations,
   onCancelRequest,
+  onDetailRequest,
 }: CalendarSidePanelProps): JSX.Element {
   const dayReservations = useMemo(() => {
     if (!selectedDate) return [];
@@ -135,6 +137,7 @@ export function CalendarSidePanel({
                   reservations={group}
                   color={color}
                   onCancelRequest={onCancelRequest}
+                  onDetailRequest={onDetailRequest}
                 />
               );
             })}
@@ -150,6 +153,7 @@ interface BuildingGroupProps {
   reservations: Reservation[];
   color: { main: string; bg: string; border: string };
   onCancelRequest: (id: number) => void;
+  onDetailRequest: (id: number) => void;
 }
 
 function BuildingGroup({
@@ -157,6 +161,7 @@ function BuildingGroup({
   reservations,
   color,
   onCancelRequest,
+  onDetailRequest,
 }: BuildingGroupProps): JSX.Element {
   return (
     <>
@@ -194,7 +199,7 @@ function BuildingGroup({
             {formatTime(r.start_datetime)}-{formatTime(r.end_datetime)}
           </td>
           <td className="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
-            {r.applicant_team}
+            {r.applicant_team || '-'}
           </td>
           <td className="px-3 py-2 text-xs text-gray-700 whitespace-nowrap">
             {r.applicant_name}
@@ -209,14 +214,23 @@ function BuildingGroup({
             <StatusBadge status={r.status} />
           </td>
           <td className="px-3 py-2">
-            <button
-              type="button"
-              disabled={!isCancellable(r.status)}
-              onClick={() => onCancelRequest(r.id)}
-              className="rounded border border-[#E5E7EB] px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              취소하기
-            </button>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => onDetailRequest(r.id)}
+                className="rounded border border-brand-primary/30 px-2 py-1 text-xs text-brand-primary hover:bg-brand-primary/5 transition-colors"
+              >
+                상세보기
+              </button>
+              <button
+                type="button"
+                disabled={!isCancellable(r.status)}
+                onClick={() => onCancelRequest(r.id)}
+                className="rounded border border-[#E5E7EB] px-2 py-1 text-xs text-gray-600 hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                취소하기
+              </button>
+            </div>
           </td>
         </tr>
       ))}
