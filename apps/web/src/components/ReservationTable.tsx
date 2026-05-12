@@ -11,7 +11,8 @@ interface Credentials {
 }
 
 interface ReservationTableProps {
-  reservations: Reservation[];
+  upcoming: Reservation[];
+  past: Reservation[];
   credentials: Credentials;
   onGoToApply: () => void;
   onCancelSuccess: () => void;
@@ -405,18 +406,15 @@ function ReservationList({
 }
 
 function ReservationTable({
-  reservations,
+  upcoming,
+  past,
   credentials,
   onGoToApply,
   onCancelSuccess,
 }: ReservationTableProps): JSX.Element {
   const [showPast, setShowPast] = useState(false);
 
-  const now = new Date();
-  const upcoming = reservations.filter((r) => new Date(r.end_datetime) >= now);
-  const past = reservations.filter((r) => new Date(r.end_datetime) < now);
-
-  if (reservations.length === 0) {
+  if (upcoming.length === 0 && past.length === 0) {
     return <EmptyState onGoToApply={onGoToApply} />;
   }
 

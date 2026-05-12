@@ -40,13 +40,13 @@ describe('ListTable', () => {
         makeReservation({ id: 2 }),
       ];
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(screen.getByText(/전체 예약 2건/)).toBeInTheDocument();
     });
 
     it('예약이 0건일 때 "전체 예약 0건"을 표시한다', () => {
-      render(<ListTable reservations={[]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(screen.getByText(/전체 예약 0건/)).toBeInTheDocument();
     });
@@ -54,7 +54,7 @@ describe('ListTable', () => {
 
   describe('10개 컬럼 렌더링', () => {
     it('모든 컬럼 헤더를 표시한다', () => {
-      render(<ListTable reservations={[]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(screen.getByText('날짜')).toBeInTheDocument();
       expect(screen.getByText('건물')).toBeInTheDocument();
@@ -79,7 +79,7 @@ describe('ListTable', () => {
         status: 'confirmed',
       });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       // 날짜: "04.16"
       expect(screen.getByText('04.16')).toBeInTheDocument();
@@ -109,7 +109,7 @@ describe('ListTable', () => {
         end_datetime: '2026-01-05T11:00:00+09:00',
       });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(screen.getByText('01.05')).toBeInTheDocument();
     });
@@ -119,7 +119,7 @@ describe('ListTable', () => {
     it('건물명에 따른 컬러 배지를 인라인 스타일로 렌더링한다', () => {
       const reservation = makeReservation();
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const badge = screen.getByText('본당');
       expect(badge).toHaveStyle({ backgroundColor: '#EFF6FF', color: '#2563EB' });
@@ -137,7 +137,7 @@ describe('ListTable', () => {
         },
       });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const badge = screen.getByText('알수없는건물');
       expect(badge).toHaveStyle({ backgroundColor: '#F9FAFB', color: '#6B7280' });
@@ -152,7 +152,7 @@ describe('ListTable', () => {
         makeReservation({ id: 3, start_datetime: '2026-04-17T10:00:00+09:00', end_datetime: '2026-04-17T12:00:00+09:00' }),
       ];
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const rows = screen.getAllByRole('row').slice(1); // 헤더 제외
       expect(within(rows[0]).getByText('04.16')).toBeInTheDocument();
@@ -166,7 +166,7 @@ describe('ListTable', () => {
         makeReservation({ id: 2, start_datetime: '2026-04-16T09:00:00+09:00', end_datetime: '2026-04-16T11:00:00+09:00' }),
       ];
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const rows = screen.getAllByRole('row').slice(1);
       expect(within(rows[0]).getByText('09:00-11:00')).toBeInTheDocument();
@@ -178,7 +178,7 @@ describe('ListTable', () => {
     it('confirmed 상태에서 취소하기 버튼이 활성화된다', () => {
       const reservation = makeReservation({ status: 'confirmed' });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const button = screen.getByRole('button', { name: '취소하기' });
       expect(button).not.toBeDisabled();
@@ -187,7 +187,7 @@ describe('ListTable', () => {
     it('pending 상태에서 취소하기 버튼이 활성화된다', () => {
       const reservation = makeReservation({ status: 'pending' });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const button = screen.getByRole('button', { name: '취소하기' });
       expect(button).not.toBeDisabled();
@@ -196,7 +196,7 @@ describe('ListTable', () => {
     it('rejected 상태에서 취소하기 버튼이 비활성화된다', () => {
       const reservation = makeReservation({ status: 'rejected' });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const button = screen.getByRole('button', { name: '취소하기' });
       expect(button).toBeDisabled();
@@ -205,7 +205,7 @@ describe('ListTable', () => {
     it('cancelled 상태에서 취소하기 버튼이 비활성화된다', () => {
       const reservation = makeReservation({ status: 'cancelled' });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       const button = screen.getByRole('button', { name: '취소하기' });
       expect(button).toBeDisabled();
@@ -216,7 +216,7 @@ describe('ListTable', () => {
       const onCancelRequest = vi.fn();
       const reservation = makeReservation({ id: 42, status: 'confirmed' });
 
-      render(<ListTable reservations={[reservation]} onCancelRequest={onCancelRequest} />);
+      render(<ListTable reservations={[reservation]} onCancelRequest={onCancelRequest} onDetailRequest={vi.fn()} />);
 
       await user.click(screen.getByRole('button', { name: '취소하기' }));
 
@@ -234,7 +234,7 @@ describe('ListTable', () => {
         makeReservation({ id: 4, status: 'cancelled' }),
       ];
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(screen.getByText('확정')).toBeInTheDocument();
       expect(screen.getByText('대기')).toBeInTheDocument();
@@ -251,7 +251,7 @@ describe('ListTable', () => {
       ];
       const original = [...reservations];
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} />);
+      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
       expect(reservations[0].id).toBe(original[0].id);
       expect(reservations[1].id).toBe(original[1].id);

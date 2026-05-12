@@ -1,10 +1,9 @@
-import { describe, it, expect, vi } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ListFilterBar } from '../components/admin/ListFilterBar';
-import type { Reservation, Space } from '../types';
-
-// --- 테스트 데이터 ---
+import type { Space } from '../types';
+import type { PaginatedReservationsFilters } from '../hooks/usePaginatedReservations';
 
 const mockSpaces: Space[] = [
   {
@@ -41,327 +40,270 @@ const mockSpaces: Space[] = [
   },
 ];
 
-const mockReservations: Reservation[] = [
-  {
-    id: 1,
-    space: mockSpaces[0],
-    applicant_name: '홍길동',
-    applicant_phone: '010-1234-5678',
-    applicant_team: '예배부',
-    team: null,
-    custom_team_name: null,
-    leader_phone: '010-0000-0000',
-    headcount: 100,
-    purpose: '예배',
-    start_datetime: '2026-04-16T10:00:00+09:00',
-    end_datetime: '2026-04-16T12:00:00+09:00',
-    status: 'confirmed',
-    admin_note: null,
-    created_at: '2026-04-10T09:00:00+09:00',
-  },
-  {
-    id: 2,
-    space: mockSpaces[2],
-    applicant_name: '김철수',
-    applicant_phone: '010-2222-3333',
-    applicant_team: '교육부',
-    team: null,
-    custom_team_name: null,
-    leader_phone: '010-0000-0000',
-    headcount: 30,
-    purpose: '세미나',
-    start_datetime: '2026-04-17T14:00:00+09:00',
-    end_datetime: '2026-04-17T16:00:00+09:00',
-    status: 'pending',
-    admin_note: null,
-    created_at: '2026-04-11T09:00:00+09:00',
-  },
-  {
-    id: 3,
-    space: mockSpaces[3],
-    applicant_name: '이영희',
-    applicant_phone: '010-4444-5555',
-    applicant_team: '청년부',
-    team: null,
-    custom_team_name: null,
-    leader_phone: '010-0000-0000',
-    headcount: 50,
-    purpose: '모임',
-    start_datetime: '2026-04-18T09:00:00+09:00',
-    end_datetime: '2026-04-18T11:00:00+09:00',
-    status: 'confirmed',
-    admin_note: null,
-    created_at: '2026-04-12T09:00:00+09:00',
-  },
-];
-
-function createDefaultProps(overrides: Partial<Parameters<typeof ListFilterBar>[0]> = {}) {
+function createDefaultProps(
+  overrides: Partial<Parameters<typeof ListFilterBar>[0]> = {},
+) {
+  const filters: PaginatedReservationsFilters = {
+    from_date: '2026-04-16',
+    to_date: '2026-04-23',
+  };
   return {
-    reservations: mockReservations,
-    spaceFilter: new Set<number>(),
-    onSpaceFilterChange: vi.fn(),
-    datePreset: '1w' as const,
-    onDatePresetChange: vi.fn(),
-    dateRange: { from: '2026-04-16', to: '2026-04-23' },
-    onDateRangeChange: vi.fn(),
-    teamFilter: new Set<string>(),
-    onTeamFilterChange: vi.fn(),
+    filters,
+    onFiltersChange: vi.fn(),
     spaces: mockSpaces,
+    isLoading: false,
     ...overrides,
   };
 }
 
-describe('ListFilterBar', () => {
-  // --- 기본 렌더링 ---
-
-  it('세 개의 필터 버튼이 렌더링된다', () => {
-    render(<ListFilterBar {...createDefaultProps()} />);
-    expect(screen.getByRole('button', { name: /장소/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /1주 이내/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /그룹/i })).toBeInTheDocument();
+describe('ListFilterBar (서버 필터 시그니처)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-04-16T09:00:00+09:00'));
   });
 
-  // --- 장소 필터 드롭다운 ---
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // --- 기본 렌더링 ---
+
+  it('장소 / 기간 / 검색 세 개 영역이 렌더링된다', () => {
+    render(<ListFilterBar {...createDefaultProps()} />);
+    expect(screen.getByRole('button', { name: '장소 필터' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '기간 필터' })).toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText('신청자 이름 검색'),
+    ).toBeInTheDocument();
+  });
+
+  it('그룹/팀 필터 UI 가 노출되지 않는다 (T3 에서 제거)', () => {
+    render(<ListFilterBar {...createDefaultProps()} />);
+    expect(
+      screen.queryByRole('button', { name: /그룹/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  // --- 장소 필터 (단일 선택) ---
 
   describe('장소 필터', () => {
-    it('장소 버튼 클릭 시 드롭다운이 열린다', async () => {
-      const user = userEvent.setup();
+    it('드롭다운에 "전체" + 건물별 그룹핑 + 장소들이 표시된다', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ListFilterBar {...createDefaultProps()} />);
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
 
-      expect(screen.getByText('전체 장소')).toBeInTheDocument();
-    });
-
-    it('드롭다운에 건물별로 그룹핑된 장소가 표시된다', async () => {
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps()} />);
-
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-
+      expect(screen.getByRole('button', { name: '전체 장소' })).toBeInTheDocument();
       expect(screen.getByText('본당')).toBeInTheDocument();
       expect(screen.getByText('가나안홀')).toBeInTheDocument();
       expect(screen.getByText('무지개홀')).toBeInTheDocument();
-      expect(screen.getByText('대예배실')).toBeInTheDocument();
-      expect(screen.getByText('소예배실')).toBeInTheDocument();
-      expect(screen.getByText('세미나실')).toBeInTheDocument();
-      expect(screen.getByText('다목적실')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '대예배실' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '소예배실' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '세미나실' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '다목적실' })).toBeInTheDocument();
     });
 
-    it('개별 장소 체크박스 클릭 시 onSpaceFilterChange가 호출된다', async () => {
-      const onSpaceFilterChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps({ onSpaceFilterChange })} />);
+    it('장소 선택 시 onFiltersChange({...filters, space_id}) 호출', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(
+        <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
+      );
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      await user.click(screen.getByLabelText('대예배실'));
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      await user.click(screen.getByRole('button', { name: '대예배실' }));
 
-      expect(onSpaceFilterChange).toHaveBeenCalledWith(new Set([1]));
+      expect(onFiltersChange).toHaveBeenCalledWith(
+        expect.objectContaining({
+          space_id: 1,
+          from_date: '2026-04-16',
+          to_date: '2026-04-23',
+        }),
+      );
     });
 
-    it('전체선택 클릭 시 모든 장소가 선택된다', async () => {
-      const onSpaceFilterChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps({ onSpaceFilterChange })} />);
-
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      await user.click(screen.getByTestId('space-select-all'));
-
-      expect(onSpaceFilterChange).toHaveBeenCalledWith(new Set([1, 2, 3, 4]));
-    });
-
-    it('전체해제 클릭 시 모든 장소가 해제된다', async () => {
-      const onSpaceFilterChange = vi.fn();
-      const user = userEvent.setup();
+    it('"전체 장소" 선택 시 space_id 가 undefined 로 통보된다', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
         <ListFilterBar
           {...createDefaultProps({
-            spaceFilter: new Set([1, 2, 3, 4]),
-            onSpaceFilterChange,
+            filters: { space_id: 3, from_date: '2026-04-16', to_date: '2026-04-23' },
+            onFiltersChange,
           })}
         />,
       );
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      await user.click(screen.getByTestId('space-deselect-all'));
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      await user.click(screen.getByRole('button', { name: '전체 장소' }));
 
-      expect(onSpaceFilterChange).toHaveBeenCalledWith(new Set());
+      const arg = onFiltersChange.mock.calls[0][0];
+      expect(arg.space_id).toBeUndefined();
     });
 
-    it('건물별 전체선택 클릭 시 해당 건물 장소만 추가된다', async () => {
-      const onSpaceFilterChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps({ onSpaceFilterChange })} />);
-
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      await user.click(screen.getByTestId('building-select-본당'));
-
-      expect(onSpaceFilterChange).toHaveBeenCalledWith(new Set([1, 2]));
-    });
-
-    it('선택된 장소 개수가 버튼에 표시된다', () => {
+    it('선택된 장소명이 버튼 라벨에 표시된다', () => {
       render(
         <ListFilterBar
-          {...createDefaultProps({ spaceFilter: new Set([1, 3]) })}
+          {...createDefaultProps({
+            filters: { space_id: 3, from_date: '2026-04-16', to_date: '2026-04-23' },
+          })}
         />,
       );
 
-      expect(screen.getByRole('button', { name: /장소.*2/i })).toBeInTheDocument();
+      const trigger = screen.getByRole('button', { name: '장소 필터' });
+      expect(trigger.textContent).toContain('세미나실');
     });
   });
 
-  // --- 날짜 필터 ---
+  // --- 기간 필터 ---
 
-  describe('날짜 필터', () => {
-    it('날짜 버튼 클릭 시 프리셋 옵션이 표시된다', async () => {
-      const user = userEvent.setup();
+  describe('기간 필터', () => {
+    it('프리셋 옵션이 표시된다', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ListFilterBar {...createDefaultProps()} />);
 
-      await user.click(screen.getByRole('button', { name: /1주 이내/i }));
+      await user.click(screen.getByRole('button', { name: '기간 필터' }));
 
-      expect(screen.getByText('1주 이내')).toBeInTheDocument();
-      expect(screen.getByText('2주 이내')).toBeInTheDocument();
-      expect(screen.getByText('한달 이내')).toBeInTheDocument();
-      expect(screen.getByText('날짜선택')).toBeInTheDocument();
+      const dropdown = screen.getByTestId('date-dropdown');
+      expect(dropdown).toHaveTextContent('1주 이내');
+      expect(dropdown).toHaveTextContent('2주 이내');
+      expect(dropdown).toHaveTextContent('한달 이내');
+      expect(dropdown).toHaveTextContent('날짜선택');
     });
 
-    it('프리셋 선택 시 onDatePresetChange가 호출된다', async () => {
-      const onDatePresetChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps({ onDatePresetChange })} />);
-
-      await user.click(screen.getByRole('button', { name: /1주 이내/i }));
-      await user.click(screen.getByText('2주 이내'));
-
-      expect(onDatePresetChange).toHaveBeenCalledWith('2w');
-    });
-
-    it('프리셋 선택 시 onDateRangeChange가 자동 계산된 날짜로 호출된다', async () => {
-      const onDateRangeChange = vi.fn();
-      const onDatePresetChange = vi.fn();
-      const user = userEvent.setup();
+    it('"2주 이내" 선택 시 onFiltersChange 가 from_date/to_date 로 호출된다', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
-        <ListFilterBar
-          {...createDefaultProps({ onDateRangeChange, onDatePresetChange })}
-        />,
+        <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
       );
 
-      await user.click(screen.getByRole('button', { name: /1주 이내/i }));
-      await user.click(screen.getByText('2주 이내'));
+      await user.click(screen.getByRole('button', { name: '기간 필터' }));
+      await user.click(screen.getByRole('button', { name: '2주 이내' }));
 
-      expect(onDateRangeChange).toHaveBeenCalled();
-      const callArg = onDateRangeChange.mock.calls[0][0];
-      expect(callArg).toHaveProperty('from');
-      expect(callArg).toHaveProperty('to');
+      const arg = onFiltersChange.mock.calls[0][0];
+      expect(typeof arg.from_date).toBe('string');
+      expect(typeof arg.to_date).toBe('string');
+      // 시스템시간 2026-04-16 기준 → from=2026-04-16 to=2026-04-30
+      expect(arg.from_date).toBe('2026-04-16');
+      expect(arg.to_date).toBe('2026-04-30');
     });
 
-    it('버튼 라벨이 선택된 프리셋명으로 표시된다', () => {
-      render(
-        <ListFilterBar {...createDefaultProps({ datePreset: '2w' })} />,
-      );
+    it('"날짜선택" 모드에서 시작일 / 종료일 인풋이 노출된다', async () => {
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(<ListFilterBar {...createDefaultProps()} />);
 
-      expect(screen.getByRole('button', { name: /2주 이내/i })).toBeInTheDocument();
-    });
-
-    it('"날짜선택" 프리셋일 때 커스텀 날짜 입력 필드가 표시된다', async () => {
-      const user = userEvent.setup();
-      render(
-        <ListFilterBar {...createDefaultProps({ datePreset: 'custom' })} />,
-      );
-
-      await user.click(screen.getByRole('button', { name: /날짜선택/i }));
+      await user.click(screen.getByRole('button', { name: '기간 필터' }));
+      await user.click(screen.getByRole('button', { name: '날짜선택' }));
 
       expect(screen.getByLabelText('시작일')).toBeInTheDocument();
       expect(screen.getByLabelText('종료일')).toBeInTheDocument();
     });
+
+    it('custom 모드에서 시작일 변경 시 onFiltersChange 호출', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(
+        <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
+      );
+
+      await user.click(screen.getByRole('button', { name: '기간 필터' }));
+      await user.click(screen.getByRole('button', { name: '날짜선택' }));
+      onFiltersChange.mockClear();
+
+      const fromInput = screen.getByLabelText('시작일');
+      fireEvent.change(fromInput, { target: { value: '2026-05-01' } });
+
+      const lastCall = onFiltersChange.mock.calls.at(-1);
+      expect(lastCall?.[0]).toMatchObject({ from_date: '2026-05-01' });
+    });
   });
 
-  // --- 그룹(부서) 필터 ---
+  // --- 검색 입력 ---
 
-  describe('그룹 필터', () => {
-    it('그룹 버튼 클릭 시 예약 데이터에서 추출된 팀 목록이 표시된다', async () => {
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps()} />);
+  describe('검색', () => {
+    it('search 입력 변경 시 onFiltersChange({...filters, search}) 호출', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(
+        <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
+      );
 
-      await user.click(screen.getByRole('button', { name: /그룹/i }));
+      const input = screen.getByPlaceholderText('신청자 이름 검색');
+      await user.type(input, '홍');
 
-      expect(screen.getByLabelText('예배부')).toBeInTheDocument();
-      expect(screen.getByLabelText('교육부')).toBeInTheDocument();
-      expect(screen.getByLabelText('청년부')).toBeInTheDocument();
+      const lastCall = onFiltersChange.mock.calls.at(-1);
+      expect(lastCall?.[0]).toMatchObject({ search: '홍' });
     });
 
-    it('팀 체크박스 클릭 시 onTeamFilterChange가 호출된다', async () => {
-      const onTeamFilterChange = vi.fn();
-      const user = userEvent.setup();
-      render(<ListFilterBar {...createDefaultProps({ onTeamFilterChange })} />);
-
-      await user.click(screen.getByRole('button', { name: /그룹/i }));
-      await user.click(screen.getByLabelText('예배부'));
-
-      expect(onTeamFilterChange).toHaveBeenCalledWith(new Set(['예배부']));
-    });
-
-    it('이미 선택된 팀을 클릭하면 해제된다', async () => {
-      const onTeamFilterChange = vi.fn();
-      const user = userEvent.setup();
+    it('search 가 빈 문자열로 비워지면 search 키가 빠지거나 빈 문자열로 통보된다', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
         <ListFilterBar
           {...createDefaultProps({
-            teamFilter: new Set(['예배부']),
-            onTeamFilterChange,
+            filters: { search: '홍', from_date: '2026-04-16', to_date: '2026-04-23' },
+            onFiltersChange,
           })}
         />,
       );
 
-      await user.click(screen.getByRole('button', { name: /그룹/i }));
-      await user.click(screen.getByLabelText('예배부'));
+      const input = screen.getByPlaceholderText('신청자 이름 검색');
+      await user.clear(input);
 
-      expect(onTeamFilterChange).toHaveBeenCalledWith(new Set());
+      const lastCall = onFiltersChange.mock.calls.at(-1);
+      const arg = lastCall?.[0];
+      // 빈 문자열은 hook 의 buildParams 에서 제외됨 → 명세 상 빈 문자열 OK
+      expect(arg.search === '' || arg.search === undefined).toBe(true);
     });
   });
 
-  // --- 드롭다운 공통 동작 ---
+  // --- 드롭다운 공통 ---
 
   describe('드롭다운 공통 동작', () => {
     it('하나의 드롭다운을 열면 다른 드롭다운이 닫힌다', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ListFilterBar {...createDefaultProps()} />);
 
-      // 장소 드롭다운 열기
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      expect(screen.getByText('전체 장소')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      expect(screen.getByRole('button', { name: '전체 장소' })).toBeInTheDocument();
 
-      // 그룹 드롭다운 열기 → 장소 드롭다운 닫힘
-      await user.click(screen.getByRole('button', { name: /그룹/i }));
-      expect(screen.queryByText('전체 장소')).not.toBeInTheDocument();
-      expect(screen.getByLabelText('예배부')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '기간 필터' }));
+      expect(
+        screen.queryByRole('button', { name: '전체 장소' }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByTestId('date-dropdown')).toBeInTheDocument();
     });
 
     it('같은 버튼을 다시 클릭하면 드롭다운이 닫힌다', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ListFilterBar {...createDefaultProps()} />);
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      expect(screen.getByText('전체 장소')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      expect(screen.getByRole('button', { name: '전체 장소' })).toBeInTheDocument();
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      expect(screen.queryByText('전체 장소')).not.toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      expect(
+        screen.queryByRole('button', { name: '전체 장소' }),
+      ).not.toBeInTheDocument();
     });
 
     it('외부 클릭 시 드롭다운이 닫힌다', async () => {
-      const user = userEvent.setup();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
         <div>
-          <div data-testid="outside">외부 영역</div>
+          <div data-testid="outside">외부</div>
           <ListFilterBar {...createDefaultProps()} />
         </div>,
       );
 
-      await user.click(screen.getByRole('button', { name: /장소/i }));
-      expect(screen.getByText('전체 장소')).toBeInTheDocument();
+      await user.click(screen.getByRole('button', { name: '장소 필터' }));
+      expect(screen.getByRole('button', { name: '전체 장소' })).toBeInTheDocument();
 
       await user.click(screen.getByTestId('outside'));
-      expect(screen.queryByText('전체 장소')).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: '전체 장소' }),
+      ).not.toBeInTheDocument();
     });
   });
 });

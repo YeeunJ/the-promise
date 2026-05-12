@@ -11,6 +11,8 @@ export interface Space {
   floor: number | null;
   capacity: number | null;
   description: string | null;
+  is_active?: boolean;
+  created_at?: string;
 }
 
 export interface BuildingWithSpaces extends Building {
@@ -76,6 +78,14 @@ export interface ApiError {
   message: string;
 }
 
+export interface PaginatedResponse<T> {
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  results: T[];
+}
+
 export interface OccupiedSlot {
   start_datetime: string;
   end_datetime: string;
@@ -103,4 +113,73 @@ export { ADMIN_TOKEN_KEY } from '../lib/constants';
 export interface UpdateReservationStatusPayload {
   status: 'confirmed' | 'rejected' | 'cancelled';
   admin_note?: string;
+}
+
+// --- Admin CRUD (phase 1.5.2) ---
+
+export interface AdminTeamPastor {
+  id: number;
+  name: string;
+  title: string;
+}
+
+export interface AdminTeamDepartment {
+  id: number;
+  name: string;
+}
+
+export interface AdminTeam {
+  id: number;
+  name: string;
+  department: AdminTeamDepartment | null;
+  // /admin/teams/ 응답에는 pastor_display 가 없다. 표시는 클라에서 `${name} ${title}` 조합
+  pastor: AdminTeamPastor | null;
+  leader_phone: string;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminTeamWritePayload {
+  name: string;
+  department: number | null;
+  pastor: number | null;
+  leader_phone: string;
+}
+
+export interface AdminBuilding {
+  id: number;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminBuildingWritePayload {
+  name: string;
+  description: string | null;
+}
+
+export interface AdminSpaceBuilding {
+  id: number;
+  name: string;
+  description: string | null;
+}
+
+export interface AdminSpace {
+  id: number;
+  building: AdminSpaceBuilding;
+  name: string;
+  floor: number | null;
+  capacity: number | null;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface AdminSpaceWritePayload {
+  building: number;
+  name: string;
+  floor: number | null;
+  capacity: number | null;
+  description: string | null;
 }
