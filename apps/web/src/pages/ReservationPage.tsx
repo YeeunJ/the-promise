@@ -1,37 +1,71 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import axios from 'axios';
-import type { Reservation } from '../types';
+import type { PaginatedResponse, Reservation } from '../types';
 import ReservationForm from '../components/ReservationForm';
 import ReservationSummary from '../components/ReservationSummary';
 import LookupForm from '../components/LookupForm';
 import ReservationTable from '../components/ReservationTable';
 
 type ActiveTab = 'apply' | 'lookup';
+type Credentials = { name: string; phone: string };
 
 function ReservationPage(): JSX.Element {
   const [activeTab, setActiveTab] = useState<ActiveTab>('apply');
   const [submittedReservation, setSubmittedReservation] = useState<Reservation | null>(null);
-  const [lookupResults, setLookupResults] = useState<Reservation[]>([]);
-  const [lookupCredentials, setLookupCredentials] = useState<{ name: string; phone: string } | null>(null);
+  const [credentials, setCredentials] = useState<Credentials | null>(null);
+  const [upcoming, setUpcoming] = useState<Reservation[]>([]);
+  const [past, setPast] = useState<Reservation[]>([]);
+  const [isLookupLoading, setIsLookupLoading] = useState(false);
+  const [lookupError, setLookupError] = useState<string | null>(null);
+
+  function resetLookup() {
+    setCredentials(null);
+    setUpcoming([]);
+    setPast([]);
+    setLookupError(null);
+  }
 
   function handleTabChange(tab: ActiveTab) {
     setActiveTab(tab);
     if (tab === 'apply') {
-      setLookupResults([]);
-      setLookupCredentials(null);
+      resetLookup();
     }
   }
 
-  async function handleCancelSuccess() {
-    if (lookupCredentials === null) return;
+  const fetchLookup = useCallback(async (creds: Credentials): Promise<void> => {
+    setIsLookupLoading(true);
+    setLookupError(null);
     try {
-      const response = await axios.get<Reservation[]>(
-        `${import.meta.env.VITE_API_BASE_URL}/api/v1/reservations/`,
-        { params: { name: lookupCredentials.name, phone: lookupCredentials.phone } }
-      );
-      setLookupResults(response.data);
+      const baseUrl = import.meta.env.VITE_API_BASE_URL as string;
+      const params = { name: creds.name, phone: creds.phone, page_size: 100 };
+      const [currentRes, pastRes] = await Promise.all([
+        axios.get<PaginatedResponse<Reservation>>(
+          `${baseUrl}/api/v1/reservations/current/`,
+          { params },
+        ),
+        axios.get<PaginatedResponse<Reservation>>(
+          `${baseUrl}/api/v1/reservations/past/`,
+          { params },
+        ),
+      ]);
+      setUpcoming(currentRes.data.results);
+      setPast(pastRes.data.results);
     } catch {
-      // 재조회 실패 시 기존 목록 유지
+      setLookupError('조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsLookupLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (credentials) {
+      void fetchLookup(credentials);
+    }
+  }, [credentials, fetchLookup]);
+
+  async function handleCancelSuccess(): Promise<void> {
+    if (credentials) {
+      await fetchLookup(credentials);
     }
   }
 
@@ -89,33 +123,34 @@ function ReservationPage(): JSX.Element {
 
         {activeTab === 'lookup' && (
           <div className="max-w-screen-xl mx-auto px-6 py-8">
-            {lookupCredentials === null ? (
+            {credentials === null ? (
               <div className="max-w-lg mx-auto">
-                <LookupForm onResult={(r, name, phone) => {
-                  setLookupResults(r);
-                  setLookupCredentials({ name, phone });
-                }} />
+                <LookupForm
+                  onSubmit={(c) => setCredentials(c)}
+                  isLoading={isLookupLoading}
+                />
               </div>
             ) : (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-gray-700">
-                    {lookupCredentials.name}님의 예약 내역
+                    {credentials.name}님의 예약 내역
                   </span>
                   <button
                     type="button"
-                    onClick={() => {
-                      setLookupCredentials(null);
-                      setLookupResults([]);
-                    }}
+                    onClick={resetLookup}
                     className="text-sm text-brand-primary hover:text-brand-secondary font-medium transition-colors"
                   >
                     ← 다시 조회
                   </button>
                 </div>
+                {lookupError !== null && (
+                  <p className="text-sm text-red-600">{lookupError}</p>
+                )}
                 <ReservationTable
-                  reservations={lookupResults}
-                  credentials={lookupCredentials}
+                  upcoming={upcoming}
+                  past={past}
+                  credentials={credentials}
                   onGoToApply={() => handleTabChange('apply')}
                   onCancelSuccess={handleCancelSuccess}
                 />

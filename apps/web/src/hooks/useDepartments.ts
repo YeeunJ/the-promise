@@ -49,3 +49,8 @@ export function useDepartments(): UseDepartmentsResult {
 
   return { departments, isLoading, error };
 }
+
+// 테스트 전용 export — 모듈 단위 캐시 초기화
+export function __resetDepartmentsCacheForTest(): void {
+  cachedDepartments = null;
+}

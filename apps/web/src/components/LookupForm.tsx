@@ -1,23 +1,21 @@
 import { useState } from 'react';
-import axios from 'axios';
 import { normalizePhone } from '../utils/formatPhone';
-import type { Reservation } from '../types/index';
 
 interface LookupFormProps {
-  onResult: (reservations: Reservation[], name: string, phone: string) => void;
+  onSubmit: (credentials: { name: string; phone: string }) => void;
+  isLoading?: boolean;
 }
 
-function LookupForm({ onResult }: LookupFormProps): JSX.Element {
+function LookupForm({ onSubmit, isLoading = false }: LookupFormProps): JSX.Element {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   function handlePhoneChange(e: React.ChangeEvent<HTMLInputElement>) {
     setPhone(normalizePhone(e.target.value));
   }
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
 
@@ -30,18 +28,7 @@ function LookupForm({ onResult }: LookupFormProps): JSX.Element {
       return;
     }
 
-    setIsLoading(true);
-    try {
-      const response = await axios.get<Reservation[]>(
-        `${import.meta.env.VITE_API_BASE_URL}/api/v1/reservations/`,
-        { params: { name: name.trim(), phone: phone.trim() } }
-      );
-      onResult(response.data, name.trim(), phone.trim());
-    } catch {
-      setError('조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
-    } finally {
-      setIsLoading(false);
-    }
+    onSubmit({ name: name.trim(), phone: phone.trim() });
   }
 
   return (

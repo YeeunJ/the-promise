@@ -40,6 +40,7 @@ describe('CalendarSidePanel', () => {
           selectedDate={null}
           reservations={[]}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -54,6 +55,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={[]}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -73,6 +75,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -135,6 +138,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -149,6 +153,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -168,6 +173,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={mixedReservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -196,6 +202,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -217,6 +224,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -236,6 +244,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={onCancelRequest}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -257,6 +266,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={onCancelRequest}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -277,6 +287,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -294,6 +305,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 
@@ -313,6 +325,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
       // 취소/거절 예약도 행(row)으로는 표시됨
@@ -346,6 +359,7 @@ describe('CalendarSidePanel', () => {
           selectedDate="2026-04-16"
           reservations={reservations}
           onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
         />
       );
 

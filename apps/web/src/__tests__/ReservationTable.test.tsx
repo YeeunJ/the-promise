@@ -37,7 +37,8 @@ function makeReservation(overrides: Partial<Reservation> = {}): Reservation {
 }
 
 const defaultProps = {
-  reservations: [] as Reservation[],
+  upcoming: [] as Reservation[],
+  past: [] as Reservation[],
   credentials: { name: '홍길동', phone: '010-1234-5678' },
   onGoToApply: vi.fn(),
   onCancelSuccess: vi.fn(),
@@ -84,7 +85,7 @@ describe('ReservationTable — 빈 상태', () => {
 describe('ReservationTable — 결과 요약 헤더', () => {
   it('예정된 예약이 있을 때 건수가 표시된다 (happy path)', () => {
     const reservations = [makeReservation({ id: 1 }), makeReservation({ id: 2 })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     expect(screen.getByText(/예정된 예약/)).toBeInTheDocument();
     expect(screen.getByText('2건')).toBeInTheDocument();
@@ -92,7 +93,7 @@ describe('ReservationTable — 결과 요약 헤더', () => {
 
   it('예약이 1건일 때 1건이 표시된다', () => {
     const reservations = [makeReservation()];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     expect(screen.getByText('1건')).toBeInTheDocument();
   });
@@ -111,7 +112,7 @@ describe('ReservationTable — 취소 모달', () => {
 
   it('confirmed 예약에 취소 버튼이 표시된다 (happy path)', () => {
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     // 모바일 카드 + 데스크탑 테이블 둘 다 렌더링되므로 getAllBy 사용
     expect(screen.getAllByRole('button', { name: '예약 취소' }).length).toBeGreaterThanOrEqual(1);
@@ -120,7 +121,7 @@ describe('ReservationTable — 취소 모달', () => {
   it('취소 버튼 클릭 시 모달이 나타난다', async () => {
     const user = userEvent.setup();
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
 
@@ -130,7 +131,7 @@ describe('ReservationTable — 취소 모달', () => {
   it('모달에 "취소된 예약은 복구할 수 없습니다" 설명이 표시된다', async () => {
     const user = userEvent.setup();
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
 
@@ -140,7 +141,7 @@ describe('ReservationTable — 취소 모달', () => {
   it('모달에 [예약 유지] 버튼이 표시된다', async () => {
     const user = userEvent.setup();
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
 
@@ -150,7 +151,7 @@ describe('ReservationTable — 취소 모달', () => {
   it('모달에 [지금 취소] 버튼이 표시된다', async () => {
     const user = userEvent.setup();
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
 
@@ -160,7 +161,7 @@ describe('ReservationTable — 취소 모달', () => {
   it('[예약 유지] 클릭 시 모달이 닫힌다', async () => {
     const user = userEvent.setup();
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
     await user.click(screen.getByRole('button', { name: '예약 유지' }));
@@ -173,7 +174,7 @@ describe('ReservationTable — 취소 모달', () => {
     mockedAxios.post.mockRejectedValueOnce(new Error('network error'));
 
     const reservations = [makeReservation({ id: 42, status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     await user.click(screen.getAllByRole('button', { name: '예약 취소' })[0]);
     await user.click(screen.getByRole('button', { name: '지금 취소' }));
@@ -192,7 +193,7 @@ describe('ReservationTable — 취소 모달', () => {
     render(
       <ReservationTable
         {...defaultProps}
-        reservations={reservations}
+        upcoming={reservations}
         onCancelSuccess={onCancelSuccess}
       />
     );
@@ -211,7 +212,7 @@ describe('ReservationTable — 취소 모달', () => {
 
   it('cancelled 예약은 취소 버튼이 비활성화된다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'cancelled' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const cancelBtns = screen.getAllByRole('button', { name: '예약 취소' });
     cancelBtns.forEach((btn) => expect(btn).toBeDisabled());
@@ -219,7 +220,7 @@ describe('ReservationTable — 취소 모달', () => {
 
   it('rejected 예약은 취소 버튼이 비활성화된다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'rejected' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const cancelBtns = screen.getAllByRole('button', { name: '예약 취소' });
     cancelBtns.forEach((btn) => expect(btn).toBeDisabled());
@@ -231,7 +232,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블에 table-fixed 클래스가 적용된다', () => {
     const reservations = [makeReservation()];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const table = container.querySelector('table');
     expect(table).not.toBeNull();
@@ -241,7 +242,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('모바일 카드 flex 컨테이너에 min-w-0 클래스가 적용된다', () => {
     const reservations = [makeReservation()];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     // min-w-0 을 가진 요소가 존재해야 함
     const minW0Els = container.querySelectorAll('.min-w-0');
@@ -251,7 +252,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('사용목적 셀에 overflow-hidden 클래스가 적용된다', () => {
     const reservations = [makeReservation({ purpose: '긴 사용목적 텍스트'.repeat(20) })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const overflowEls = container.querySelectorAll('.overflow-hidden');
     expect(overflowEls.length).toBeGreaterThanOrEqual(1);
@@ -262,7 +263,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('티켓 다운로드 버튼에 whitespace-nowrap 클래스가 적용된다', () => {
     const reservations = [makeReservation({ status: 'confirmed' })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const ticketBtns = Array.from(container.querySelectorAll('button')).filter(
       (btn) => btn.textContent === '티켓 다운로드'
@@ -276,7 +277,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('예약 취소 버튼에 whitespace-nowrap 클래스가 적용된다', () => {
     const reservations = [makeReservation({ status: 'confirmed' })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const cancelBtns = Array.from(container.querySelectorAll('button')).filter(
       (btn) => btn.textContent === '예약 취소'
@@ -290,7 +291,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블 헤더(<th>)에 text-center 클래스가 적용된다', () => {
     const reservations = [makeReservation()];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const headers = container.querySelectorAll('th');
     expect(headers.length).toBeGreaterThanOrEqual(1);
@@ -302,7 +303,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블 사용목적 <td>에 line-clamp-2 클래스가 적용된다', () => {
     const reservations = [makeReservation({ purpose: '긴 사용목적 텍스트'.repeat(20) })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const lineClamped = container.querySelectorAll('.line-clamp-2');
     expect(lineClamped.length).toBeGreaterThanOrEqual(1);
@@ -311,7 +312,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블에 min-w-[900px] 클래스가 적용된다', () => {
     const reservations = [makeReservation()];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const table = container.querySelector('table');
     expect(table).not.toBeNull();
@@ -329,7 +330,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
         building: { id: 1, name: '가나안홀', description: null },
       },
     })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
     expect(screen.getByText('가나안홀 2층')).toBeInTheDocument();
     expect(screen.getByText('수선화·장미·샤론·올리브·백합방')).toBeInTheDocument();
   });
@@ -337,7 +338,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블 상태 td에 whitespace-nowrap 클래스가 적용된다', () => {
     const reservations = [makeReservation({ status: 'confirmed' })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const tbody = container.querySelector('tbody');
     const tds = tbody!.querySelectorAll('tr td');
@@ -349,7 +350,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블 사용목적 내부 div에 line-clamp-2 클래스가 적용된다', () => {
     const reservations = [makeReservation({ purpose: '긴 사용목적 텍스트'.repeat(20) })];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const tbody = container.querySelector('tbody');
     const tds = tbody!.querySelectorAll('tr td');
@@ -362,7 +363,7 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   it('데스크탑 테이블 데이터 행(tr)에 h-[72px] 클래스가 적용된다', () => {
     const reservations = [makeReservation()];
     const { container } = render(
-      <ReservationTable {...defaultProps} reservations={reservations} />
+      <ReservationTable {...defaultProps} upcoming={reservations} />
     );
     const tbody = container.querySelector('tbody');
     const rows = tbody!.querySelectorAll('tr');
@@ -381,7 +382,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
 
   it('기본 상태에서 "티켓 다운로드" 텍스트가 표시된다 (happy path)', () => {
     const reservations = [makeReservation()];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     expect(screen.getAllByText('티켓 다운로드').length).toBeGreaterThanOrEqual(1);
   });
@@ -396,7 +397,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
     );
 
     const reservations = [makeReservation()];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtn = screen.getAllByText('티켓 다운로드')[0];
     await user.click(ticketBtn);
@@ -411,7 +412,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
     mockedAxios.get.mockRejectedValueOnce(new Error('network error'));
 
     const reservations = [makeReservation()];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtn = screen.getAllByText('티켓 다운로드')[0];
     await user.click(ticketBtn);
@@ -426,7 +427,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
     mockedAxios.get.mockRejectedValueOnce(new Error('network error'));
 
     const reservations = [makeReservation()];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtn = screen.getAllByText('티켓 다운로드')[0];
     await user.click(ticketBtn);
@@ -438,7 +439,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
 
   it('cancelled 예약은 티켓 다운로드 버튼이 비활성화된다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'cancelled' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtns = screen.getAllByText('티켓 다운로드');
     ticketBtns.forEach((btn) => expect(btn.closest('button')).toBeDisabled());
@@ -446,7 +447,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
 
   it('rejected 예약은 티켓 다운로드 버튼이 비활성화된다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'rejected' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtns = screen.getAllByText('티켓 다운로드');
     ticketBtns.forEach((btn) => expect(btn.closest('button')).toBeDisabled());
@@ -454,7 +455,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
 
   it('confirmed 예약은 티켓 다운로드 버튼이 활성화된다', () => {
     const reservations = [makeReservation({ status: 'confirmed' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtns = screen.getAllByText('티켓 다운로드');
     ticketBtns.forEach((btn) => expect(btn.closest('button')).not.toBeDisabled());
@@ -462,7 +463,7 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
 
   it('pending 예약은 티켓 다운로드 버튼이 활성화된다', () => {
     const reservations = [makeReservation({ status: 'pending' })];
-    render(<ReservationTable {...defaultProps} reservations={reservations} />);
+    render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
     const ticketBtns = screen.getAllByText('티켓 다운로드');
     ticketBtns.forEach((btn) => expect(btn.closest('button')).not.toBeDisabled());

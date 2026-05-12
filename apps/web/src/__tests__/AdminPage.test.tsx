@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { Reservation, Space } from '../types';
@@ -12,6 +12,26 @@ vi.mock('../utils/formatDatetime', async () => {
     getKSTDateString: vi.fn(() => '2026-04-16'),
   };
 });
+vi.mock('../hooks/useSpaceOptions', () => ({
+  useSpaceOptions: vi.fn(() => ({
+    spaces: [],
+    isLoading: false,
+    error: null,
+    refetch: vi.fn(),
+  })),
+}));
+// 섹션 컴포넌트는 자체 테스트에서 검증. AdminPage 는 마운트/언마운트만 확인
+vi.mock('../components/admin/teams/TeamsSection', () => ({
+  TeamsSection: () => <div data-testid="teams-section-mock">팀 섹션</div>,
+}));
+vi.mock('../components/admin/buildings/BuildingsSection', () => ({
+  BuildingsSection: () => (
+    <div data-testid="buildings-section-mock">건물 섹션</div>
+  ),
+}));
+vi.mock('../components/admin/spaces/SpacesSection', () => ({
+  SpacesSection: () => <div data-testid="spaces-section-mock">공간 섹션</div>,
+}));
 
 import axios from 'axios';
 import AdminPage from '../pages/AdminPage';
@@ -56,14 +76,36 @@ function setupLoggedIn(): void {
   localStorage.setItem(ADMIN_TOKEN_KEY, 'test-token');
 }
 
+function paginated(reservations: Reservation[]): {
+  count: number;
+  page: number;
+  page_size: number;
+  total_pages: number;
+  results: Reservation[];
+} {
+  return {
+    count: reservations.length,
+    page: 1,
+    page_size: 100,
+    total_pages: reservations.length === 0 ? 1 : 1,
+    results: reservations,
+  };
+}
+
 function mockFetchReservations(reservations: Reservation[] = []): void {
-  mockedAxios.get.mockResolvedValueOnce({ data: reservations });
+  mockedAxios.get.mockResolvedValueOnce({ data: paginated(reservations) });
 }
 
 describe('AdminPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-04-16T09:00:00+09:00'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   // --- 기본 렌더링 ---
@@ -330,7 +372,7 @@ describe('AdminPage', () => {
 
   it('이전 달로 이동 시 해당 달 1일이 selectedDate로 설정된다', async () => {
     setupLoggedIn();
-    mockedAxios.get.mockResolvedValue({ data: [] });
+    mockedAxios.get.mockResolvedValue({ data: paginated([]) });
     render(<AdminPage />);
     const user = userEvent.setup();
 
@@ -343,7 +385,7 @@ describe('AdminPage', () => {
 
   it('다음 달로 이동 시 해당 달 1일이 selectedDate로 설정된다', async () => {
     setupLoggedIn();
-    mockedAxios.get.mockResolvedValue({ data: [] });
+    mockedAxios.get.mockResolvedValue({ data: paginated([]) });
     render(<AdminPage />);
     const user = userEvent.setup();
 
@@ -364,5 +406,183 @@ describe('AdminPage', () => {
 
     await user.click(screen.getByRole('button', { name: '로그아웃' }));
     expect(screen.getByText('관리자 로그인')).toBeInTheDocument();
+  });
+
+  // --- 1.5.3 PR-3B: viewMode 별 endpoint 분리 ---
+
+  describe('viewMode 별 endpoint 호출', () => {
+    it('calendar 모드에서 /admin/reservations/ 를 from_date/to_date 와 함께 호출한다', async () => {
+      setupLoggedIn();
+      mockedAxios.get.mockResolvedValue({ data: paginated([]) });
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+          expect.stringMatching(/\/admin\/reservations\/$/),
+          expect.objectContaining({
+            params: expect.objectContaining({
+              from_date: '2026-04-01',
+              to_date: '2026-04-30',
+              page_size: 100,
+              ordering: '-start_datetime',
+            }),
+          }),
+        );
+      });
+    });
+
+    it('list 모드 진입 시 /admin/reservations/current/ 가 호출된다', async () => {
+      setupLoggedIn();
+      mockedAxios.get.mockResolvedValue({ data: paginated([]) });
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+
+      await waitFor(() => {
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+          expect.stringMatching(/\/admin\/reservations\/current\/$/),
+          expect.objectContaining({
+            params: expect.objectContaining({ page: 1, page_size: 20 }),
+          }),
+        );
+      });
+    });
+
+    it('list 모드에서 "지난" 탭 클릭 시 /admin/reservations/past/ 호출 + page=1', async () => {
+      setupLoggedIn();
+      mockedAxios.get.mockResolvedValue({ data: paginated([]) });
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+      await waitFor(() => {
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+          expect.stringMatching(/\/current\/$/),
+          expect.anything(),
+        );
+      });
+
+      await user.click(screen.getByRole('button', { name: '지난' }));
+
+      await waitFor(() => {
+        expect(mockedAxios.get).toHaveBeenCalledWith(
+          expect.stringMatching(/\/admin\/reservations\/past\/$/),
+          expect.objectContaining({
+            params: expect.objectContaining({ page: 1 }),
+          }),
+        );
+      });
+    });
+
+    it('totalPages 가 1 보다 크면 Pagination 컴포넌트가 노출된다', async () => {
+      setupLoggedIn();
+      mockedAxios.get.mockResolvedValue({
+        data: {
+          count: 50,
+          page: 1,
+          page_size: 20,
+          total_pages: 3,
+          results: [makeReservation()],
+        },
+      });
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('navigation', { name: '페이지네이션' }),
+        ).toBeInTheDocument();
+      });
+    });
+
+    it('totalPages 가 1 이면 Pagination 컴포넌트가 노출되지 않는다', async () => {
+      setupLoggedIn();
+      mockedAxios.get.mockResolvedValue({ data: paginated([]) });
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+
+      await waitFor(() => {
+        expect(screen.getByText(/전체 예약/)).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByRole('navigation', { name: '페이지네이션' }),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('섹션 탭 전환', () => {
+    it('로그인 후 기본 섹션은 예약이고 ReservationsSection 이 렌더된다', async () => {
+      setupLoggedIn();
+      mockFetchReservations([]);
+      render(<AdminPage />);
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: '달력 보기' }),
+        ).toBeInTheDocument();
+      });
+      expect(
+        screen.queryByTestId('teams-section-mock'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('"팀" 탭 클릭 시 TeamsSection 이 노출되고 예약 영역은 사라진다', async () => {
+      setupLoggedIn();
+      mockFetchReservations([]);
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: '달력 보기' }),
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: '팀' }));
+
+      expect(screen.getByTestId('teams-section-mock')).toBeInTheDocument();
+      expect(
+        screen.queryByRole('button', { name: '달력 보기' }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('"건물" 탭 클릭 시 BuildingsSection 이 노출된다', async () => {
+      setupLoggedIn();
+      mockFetchReservations([]);
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: '달력 보기' }),
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: '건물' }));
+
+      expect(screen.getByTestId('buildings-section-mock')).toBeInTheDocument();
+    });
+
+    it('"공간" 탭 클릭 시 SpacesSection 이 노출된다', async () => {
+      setupLoggedIn();
+      mockFetchReservations([]);
+      render(<AdminPage />);
+      const user = userEvent.setup();
+
+      await waitFor(() => {
+        expect(
+          screen.getByRole('button', { name: '달력 보기' }),
+        ).toBeInTheDocument();
+      });
+
+      await user.click(screen.getByRole('button', { name: '공간' }));
+
+      expect(screen.getByTestId('spaces-section-mock')).toBeInTheDocument();
+    });
   });
 });

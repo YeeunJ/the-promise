@@ -234,9 +234,11 @@ describe('CalendarGrid', () => {
     expect(screen.queryByText('예약이 없습니다')).not.toBeInTheDocument();
   });
 
-  // --- TASK 7: CalendarGrid 수정 테스트 ---
+  // --- 셀 크기 ---
+  // 디자인 메모: TASK 7 에서 aspect-[5/4] 비율 셀 도입이 검토됐으나
+  // 보류 → 현재 운영 디자인은 고정 min-h-[120px] 유지
 
-  it('셀에 aspect-[5/4] 클래스가 적용되고 min-h-[145px]가 없다', () => {
+  it('셀에 min-h-[120px] 클래스가 적용된다', () => {
     const { container } = render(
       <CalendarGrid
         currentYear={2026}
@@ -246,12 +248,8 @@ describe('CalendarGrid', () => {
         onDateSelect={vi.fn()}
       />
     );
-    // 날짜 셀 (첫 번째 실제 날짜 셀)
-    const cells = container.querySelectorAll('[class*="aspect-"]');
+    const cells = container.querySelectorAll('[class*="min-h-[120px]"]');
     expect(cells.length).toBeGreaterThan(0);
-    // min-h-[145px]가 어디에도 없어야 함
-    const oldMinH = container.querySelector('[class*="min-h-[145px]"]');
-    expect(oldMinH).toBeNull();
   });
 
   it('칩이 건물 컬러 기반으로 표시된다 (본당 = 파란색 계열)', () => {

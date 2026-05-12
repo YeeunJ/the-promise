@@ -1,20 +1,16 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { getBuildingColor } from '../../lib/adminConstants';
-import type { Reservation, Space } from '../../types';
+import type { Space } from '../../types';
+import type { PaginatedReservationsFilters } from '../../hooks/usePaginatedReservations';
 
 type DatePreset = '1w' | '2w' | '1m' | 'custom';
+type OpenDropdown = 'space' | 'date' | null;
 
 interface ListFilterBarProps {
-  reservations: Reservation[];
-  spaceFilter: Set<number>;
-  onSpaceFilterChange: (filter: Set<number>) => void;
-  datePreset: DatePreset;
-  onDatePresetChange: (preset: DatePreset) => void;
-  dateRange: { from: string; to: string };
-  onDateRangeChange: (range: { from: string; to: string }) => void;
-  teamFilter: Set<string>;
-  onTeamFilterChange: (filter: Set<string>) => void;
+  filters: PaginatedReservationsFilters;
+  onFiltersChange: (next: PaginatedReservationsFilters) => void;
   spaces: Space[];
+  isLoading?: boolean;
 }
 
 const DATE_PRESET_LABELS: Record<DatePreset, string> = {
@@ -24,40 +20,37 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
   custom: '날짜선택',
 };
 
-function computeDateRange(preset: Exclude<DatePreset, 'custom'>): {
+function formatDateOnly(date: Date): string {
+  return date.toISOString().slice(0, 10);
+}
+
+function computePresetRange(preset: Exclude<DatePreset, 'custom'>): {
   from: string;
   to: string;
 } {
   const today = new Date();
-  const from = today.toISOString().slice(0, 10);
+  const from = formatDateOnly(today);
   const future = new Date(today);
   if (preset === '1w') future.setDate(future.getDate() + 7);
   else if (preset === '2w') future.setDate(future.getDate() + 14);
   else future.setMonth(future.getMonth() + 1);
-  const to = future.toISOString().slice(0, 10);
+  const to = formatDateOnly(future);
   return { from, to };
 }
 
-type OpenDropdown = 'space' | 'date' | 'team' | null;
-
 export function ListFilterBar({
-  reservations,
-  spaceFilter,
-  onSpaceFilterChange,
-  datePreset,
-  onDatePresetChange,
-  dateRange,
-  onDateRangeChange,
-  teamFilter,
-  onTeamFilterChange,
+  filters,
+  onFiltersChange,
   spaces,
-}: ListFilterBarProps) {
+  isLoading = false,
+}: ListFilterBarProps): JSX.Element {
   const [openDropdown, setOpenDropdown] = useState<OpenDropdown>(null);
+  const [datePreset, setDatePreset] = useState<DatePreset>('1w');
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown on outside click
   useEffect(() => {
-    function handleClick(e: MouseEvent) {
+    function handleClick(e: MouseEvent): void {
       if (
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
@@ -81,104 +74,81 @@ export function ListFilterBar({
     return groups;
   }, [spaces]);
 
-  // Extract unique teams from reservations
-  const teams = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of reservations) {
-      set.add(r.applicant_team);
-    }
-    return [...set].sort();
-  }, [reservations]);
+  const selectedSpace = useMemo(() => {
+    if (typeof filters.space_id !== 'number') return null;
+    return spaces.find((s) => s.id === filters.space_id) ?? null;
+  }, [filters.space_id, spaces]);
 
-  function toggleDropdown(name: OpenDropdown) {
+  function toggleDropdown(name: OpenDropdown): void {
     setOpenDropdown((prev) => (prev === name ? null : name));
   }
 
-  // --- Space filter handlers ---
-  function handleSpaceToggle(spaceId: number) {
-    const next = new Set(spaceFilter);
-    if (next.has(spaceId)) next.delete(spaceId);
-    else next.add(spaceId);
-    onSpaceFilterChange(next);
+  function handleSpaceSelect(spaceId: number | undefined): void {
+    onFiltersChange({ ...filters, space_id: spaceId });
+    setOpenDropdown(null);
   }
 
-  function handleSelectAllSpaces() {
-    onSpaceFilterChange(new Set(spaces.map((s) => s.id)));
-  }
-
-  function handleDeselectAllSpaces() {
-    onSpaceFilterChange(new Set());
-  }
-
-  function handleBuildingSelect(buildingName: string) {
-    const buildingSpaces = buildingGroups.get(buildingName) ?? [];
-    const next = new Set(spaceFilter);
-    for (const s of buildingSpaces) next.add(s.id);
-    onSpaceFilterChange(next);
-  }
-
-  // --- Date filter handlers ---
-  function handleDatePresetSelect(preset: DatePreset) {
-    onDatePresetChange(preset);
+  function handlePresetSelect(preset: DatePreset): void {
+    setDatePreset(preset);
     if (preset !== 'custom') {
-      onDateRangeChange(computeDateRange(preset));
+      const { from, to } = computePresetRange(preset);
+      onFiltersChange({ ...filters, from_date: from, to_date: to });
     }
   }
 
-  // --- Team filter handlers ---
-  function handleTeamToggle(team: string) {
-    const next = new Set(teamFilter);
-    if (next.has(team)) next.delete(team);
-    else next.add(team);
-    onTeamFilterChange(next);
+  function handleCustomFromChange(value: string): void {
+    onFiltersChange({ ...filters, from_date: value });
+  }
+
+  function handleCustomToChange(value: string): void {
+    onFiltersChange({ ...filters, to_date: value });
+  }
+
+  function handleSearchChange(value: string): void {
+    onFiltersChange({ ...filters, search: value });
   }
 
   const btnClass =
-    'border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors';
+    'border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors disabled:opacity-50';
   const dropdownClass =
-    'absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-[#E5E7EB] p-3 z-50 min-w-[200px]';
+    'absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-[#E5E7EB] p-3 z-50 min-w-[220px]';
+
+  const spaceButtonLabel = selectedSpace
+    ? `장소: ${selectedSpace.name}`
+    : '장소';
 
   return (
-    <div ref={containerRef} className="flex gap-2 relative">
-      {/* Space filter */}
+    <div ref={containerRef} className="flex gap-2 relative items-center mb-3">
+      {/* Space filter (single select) */}
       <div className="relative">
         <button
           type="button"
+          aria-label="장소 필터"
           className={btnClass}
           onClick={() => toggleDropdown('space')}
+          disabled={isLoading}
         >
-          장소{spaceFilter.size > 0 ? ` ${spaceFilter.size}` : ''} ▼
+          {spaceButtonLabel} ▼
         </button>
         {openDropdown === 'space' && (
-          <div className={dropdownClass}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="font-medium text-sm">전체 장소</span>
-              <div className="flex gap-1">
-                <button
-                  type="button"
-                  data-testid="space-select-all"
-                  className="text-xs text-blue-600 hover:underline"
-                  onClick={handleSelectAllSpaces}
-                >
-                  전체선택
-                </button>
-                <span className="text-xs text-gray-300">/</span>
-                <button
-                  type="button"
-                  data-testid="space-deselect-all"
-                  className="text-xs text-blue-600 hover:underline"
-                  onClick={handleDeselectAllSpaces}
-                >
-                  전체해제
-                </button>
-              </div>
-            </div>
+          <div className={dropdownClass} data-testid="space-dropdown">
+            <button
+              type="button"
+              className={`block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 ${
+                filters.space_id === undefined
+                  ? 'font-medium text-blue-600'
+                  : ''
+              }`}
+              onClick={() => handleSpaceSelect(undefined)}
+            >
+              전체 장소
+            </button>
             {[...buildingGroups.entries()].map(
               ([buildingName, buildingSpaces]) => {
                 const color = getBuildingColor(buildingName);
                 return (
-                  <div key={buildingName} className="mb-2 last:mb-0">
-                    <div className="flex items-center justify-between mb-1">
+                  <div key={buildingName} className="mt-2 first:mt-1">
+                    <div className="mb-1">
                       <span
                         className="text-xs font-medium px-1.5 py-0.5 rounded"
                         style={{
@@ -189,29 +159,22 @@ export function ListFilterBar({
                       >
                         {buildingName}
                       </span>
-                      <button
-                        type="button"
-                        data-testid={`building-select-${buildingName}`}
-                        className="text-xs text-blue-600 hover:underline"
-                        onClick={() => handleBuildingSelect(buildingName)}
-                      >
-                        전체선택
-                      </button>
                     </div>
-                    {buildingSpaces.map((space) => (
-                      <label
-                        key={space.id}
-                        className="flex items-center gap-2 py-0.5 pl-2 text-sm cursor-pointer"
-                      >
-                        <input
-                          type="checkbox"
-                          className="accent-brand-primary"
-                          checked={spaceFilter.has(space.id)}
-                          onChange={() => handleSpaceToggle(space.id)}
-                        />
-                        {space.name}
-                      </label>
-                    ))}
+                    {buildingSpaces.map((space) => {
+                      const isSelected = filters.space_id === space.id;
+                      return (
+                        <button
+                          key={space.id}
+                          type="button"
+                          className={`block w-full text-left px-2 py-1 pl-4 text-sm rounded hover:bg-gray-100 ${
+                            isSelected ? 'font-medium text-blue-600' : ''
+                          }`}
+                          onClick={() => handleSpaceSelect(space.id)}
+                        >
+                          {space.name}
+                        </button>
+                      );
+                    })}
                   </div>
                 );
               },
@@ -224,13 +187,15 @@ export function ListFilterBar({
       <div className="relative">
         <button
           type="button"
+          aria-label="기간 필터"
           className={btnClass}
           onClick={() => toggleDropdown('date')}
+          disabled={isLoading}
         >
           {DATE_PRESET_LABELS[datePreset]} ▼
         </button>
         {openDropdown === 'date' && (
-          <div className={dropdownClass}>
+          <div className={dropdownClass} data-testid="date-dropdown">
             {(['1w', '2w', '1m', 'custom'] as DatePreset[]).map((preset) => (
               <button
                 key={preset}
@@ -238,7 +203,7 @@ export function ListFilterBar({
                 className={`block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 ${
                   datePreset === preset ? 'font-medium text-blue-600' : ''
                 }`}
-                onClick={() => handleDatePresetSelect(preset)}
+                onClick={() => handlePresetSelect(preset)}
               >
                 {DATE_PRESET_LABELS[preset]}
               </button>
@@ -253,10 +218,8 @@ export function ListFilterBar({
                     type="date"
                     aria-label="시작일"
                     className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
-                    value={dateRange.from}
-                    onChange={(e) =>
-                      onDateRangeChange({ ...dateRange, from: e.target.value })
-                    }
+                    value={filters.from_date ?? ''}
+                    onChange={(e) => handleCustomFromChange(e.target.value)}
                   />
                 </label>
                 <label className="text-sm">
@@ -267,10 +230,8 @@ export function ListFilterBar({
                     type="date"
                     aria-label="종료일"
                     className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
-                    value={dateRange.to}
-                    onChange={(e) =>
-                      onDateRangeChange({ ...dateRange, to: e.target.value })
-                    }
+                    value={filters.to_date ?? ''}
+                    onChange={(e) => handleCustomToChange(e.target.value)}
                   />
                 </label>
               </div>
@@ -279,34 +240,15 @@ export function ListFilterBar({
         )}
       </div>
 
-      {/* Team filter */}
-      <div className="relative">
-        <button
-          type="button"
-          className={btnClass}
-          onClick={() => toggleDropdown('team')}
-        >
-          그룹 ▼
-        </button>
-        {openDropdown === 'team' && (
-          <div className={dropdownClass}>
-            {teams.map((team) => (
-              <label
-                key={team}
-                className="flex items-center gap-2 py-0.5 text-sm cursor-pointer"
-              >
-                <input
-                  type="checkbox"
-                  className="accent-brand-primary"
-                  checked={teamFilter.has(team)}
-                  onChange={() => handleTeamToggle(team)}
-                />
-                {team}
-              </label>
-            ))}
-          </div>
-        )}
-      </div>
+      {/* Search input */}
+      <input
+        type="search"
+        placeholder="신청자 이름 검색"
+        className="border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm bg-white min-w-[200px] disabled:opacity-50"
+        value={filters.search ?? ''}
+        onChange={(e) => handleSearchChange(e.target.value)}
+        disabled={isLoading}
+      />
     </div>
   );
 }
