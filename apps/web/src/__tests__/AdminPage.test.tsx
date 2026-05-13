@@ -115,11 +115,12 @@ describe('AdminPage', () => {
     expect(screen.getByText('관리자 로그인')).toBeInTheDocument();
   });
 
-  it('로그인 후 타이틀이 "가나안교회 관리자"로 표시된다', async () => {
+  it('로그인 후 헤더에 "가나안교회" + "ADMIN" 뱃지가 표시된다', async () => {
     setupLoggedIn();
     mockFetchReservations();
     render(<AdminPage />);
-    expect(screen.getByText('가나안교회 관리자')).toBeInTheDocument();
+    expect(screen.getByText('가나안교회')).toBeInTheDocument();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
   });
 
   it('메인 영역이 max-w-[1920px] 클래스를 가진다', async () => {
@@ -137,9 +138,9 @@ describe('AdminPage', () => {
     mockFetchReservations();
     const { container } = render(<AdminPage />);
     // CalendarGrid에 selectedDate="2026-04-16"이 전달되어
-    // 해당 날짜 셀에 ring-brand-secondary가 적용됨
+    // 해당 날짜 셀에 ring-primary-dark가 적용됨
     await waitFor(() => {
-      const selectedCell = container.querySelector('.ring-brand-secondary');
+      const selectedCell = container.querySelector('.ring-primary-dark');
       expect(selectedCell).toBeInTheDocument();
     });
   });
@@ -150,9 +151,8 @@ describe('AdminPage', () => {
     setupLoggedIn();
     mockFetchReservations();
     render(<AdminPage />);
-    const calendarBtn = screen.getByRole('button', { name: '달력 보기' });
-    // 활성 버튼은 bg-brand-primary 스타일
-    expect(calendarBtn.className).toContain('bg-brand-primary');
+    const calendarBtn = screen.getByRole('button', { name: '달력' });
+    expect(calendarBtn).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('리스트 보기 버튼 클릭 시 뷰가 전환된다', async () => {
@@ -161,22 +161,23 @@ describe('AdminPage', () => {
     render(<AdminPage />);
     const user = userEvent.setup();
 
-    const listBtn = screen.getByRole('button', { name: '리스트 보기' });
+    const listBtn = screen.getByRole('button', { name: '리스트' });
     await user.click(listBtn);
 
     // 리스트 보기 활성
-    expect(listBtn.className).toContain('bg-brand-primary');
+    expect(listBtn).toHaveAttribute('aria-pressed', 'true');
     // 달력 보기 비활성
-    const calendarBtn = screen.getByRole('button', { name: '달력 보기' });
-    expect(calendarBtn.className).not.toContain('bg-brand-primary');
+    const calendarBtn = screen.getByRole('button', { name: '달력' });
+    expect(calendarBtn).toHaveAttribute('aria-pressed', 'false');
   });
 
-  it('달력 보기에서 월 네비게이션이 표시된다', () => {
+  it('달력 보기에서 월 네비게이션이 표시된다', async () => {
     setupLoggedIn();
     mockFetchReservations();
     render(<AdminPage />);
-    expect(screen.getByText('◀')).toBeInTheDocument();
-    expect(screen.getByText('▶')).toBeInTheDocument();
+    // CalendarGrid 내부 헤더 — fetch 완료 후 렌더
+    expect(await screen.findByRole('button', { name: '이전 달' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: '다음 달' })).toBeInTheDocument();
   });
 
   it('리스트 보기에서 월 네비게이션이 숨겨진다', async () => {
@@ -185,16 +186,16 @@ describe('AdminPage', () => {
     render(<AdminPage />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+    await user.click(screen.getByRole('button', { name: '리스트' }));
 
-    // 월 네비게이션과 월 표시가 숨겨짐
-    expect(screen.queryByText('◀')).not.toBeInTheDocument();
-    expect(screen.queryByText('▶')).not.toBeInTheDocument();
+    // 리스트 모드에서는 CalendarGrid 자체가 안 그려져서 월 nav도 없음
+    expect(screen.queryByRole('button', { name: '이전 달' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: '다음 달' })).not.toBeInTheDocument();
   });
 
   // --- 달력 보기 레이아웃 ---
 
-  it('달력 보기에서 50:50 flex 레이아웃으로 CalendarGrid와 CalendarSidePanel을 표시한다', async () => {
+  it('달력 보기에서 CalendarGrid 와 AdminSideRail 을 표시한다', async () => {
     setupLoggedIn();
     const reservations = [makeReservation()];
     mockFetchReservations(reservations);
@@ -203,8 +204,8 @@ describe('AdminPage', () => {
     await waitFor(() => {
       // CalendarGrid 렌더링 확인 (요일 헤더)
       expect(screen.getByText('일')).toBeInTheDocument();
-      // CalendarSidePanel 렌더링 확인 (오늘 날짜 예약 표시)
-      expect(screen.getByText('홍길동')).toBeInTheDocument();
+      // SideRail "오늘" 카드에 예약 표시 (오늘 날짜와 일치하는 예약)
+      expect(screen.getByText(/홍길동/)).toBeInTheDocument();
     });
   });
 
@@ -217,7 +218,7 @@ describe('AdminPage', () => {
     render(<AdminPage />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+    await user.click(screen.getByRole('button', { name: '리스트' }));
 
     await waitFor(() => {
       // ListTable 테이블 헤더 확인
@@ -246,7 +247,7 @@ describe('AdminPage', () => {
 
   // --- 취소 처리 ---
 
-  it('CancelDialog가 cancelTargetId 설정 시 표시된다', async () => {
+  it('CancelDialog가 SideRail 행 → DetailModal 의 "예약 취소" 클릭 시 표시된다', async () => {
     setupLoggedIn();
     const reservations = [makeReservation({ status: 'confirmed' })];
     mockFetchReservations(reservations);
@@ -254,14 +255,17 @@ describe('AdminPage', () => {
     const user = userEvent.setup();
 
     await waitFor(() => {
-      expect(screen.getByText('홍길동')).toBeInTheDocument();
+      expect(screen.getByText(/홍길동/)).toBeInTheDocument();
     });
 
-    // CalendarSidePanel에서 취소하기 버튼 클릭
-    const cancelBtns = screen.getAllByRole('button', { name: '취소하기' });
-    await user.click(cancelBtns[0]);
+    // SideRail "오늘" 카드의 행 클릭 → DetailModal 열기
+    await user.click(screen.getByText(/홍길동/));
 
-    // CancelDialog 모달 표시
+    // DetailModal 내 "예약 취소" 버튼 클릭
+    const detailCancelBtn = await screen.findByRole('button', { name: '예약 취소' });
+    await user.click(detailCancelBtn);
+
+    // CancelDialog 표시
     expect(screen.getByText('이 예약을 취소하시겠습니까?')).toBeInTheDocument();
   });
 
@@ -273,12 +277,13 @@ describe('AdminPage', () => {
     const user = userEvent.setup();
 
     await waitFor(() => {
-      expect(screen.getByText('홍길동')).toBeInTheDocument();
+      expect(screen.getByText(/홍길동/)).toBeInTheDocument();
     });
 
-    // 취소하기 버튼 클릭
-    const cancelBtns = screen.getAllByRole('button', { name: '취소하기' });
-    await user.click(cancelBtns[0]);
+    // SideRail 행 → DetailModal → 예약 취소
+    await user.click(screen.getByText(/홍길동/));
+    const detailCancelBtn = await screen.findByRole('button', { name: '예약 취소' });
+    await user.click(detailCancelBtn);
 
     // admin note 입력 후 확인
     mockedAxios.post.mockResolvedValueOnce({ data: {} });
@@ -335,11 +340,11 @@ describe('AdminPage', () => {
 
   // --- TASK 1: 달력 헤더 형식 ---
 
-  it('달력 헤더가 "{year}년 {month}월" 한 줄 형식으로 표시된다', () => {
+  it('SectionHeader의 subtitle에 "{year}년 {month}월"이 포함된다', () => {
     setupLoggedIn();
     mockFetchReservations();
     render(<AdminPage />);
-    expect(screen.getByText('2026년 4월')).toBeInTheDocument();
+    expect(screen.getByText(/2026년 4월/)).toBeInTheDocument();
   });
 
   // --- TASK 2: CalendarGrid confirmed 전용 ---
@@ -370,29 +375,37 @@ describe('AdminPage', () => {
 
   // --- TASK 5: 월 이동 시 selectedDate 자동 설정 ---
 
-  it('이전 달로 이동 시 해당 달 1일이 selectedDate로 설정된다', async () => {
+  it('이전 달로 이동 시 해당 달 1일이 selectedDate 로 설정된다 (셀 ring 적용)', async () => {
     setupLoggedIn();
     mockedAxios.get.mockResolvedValue({ data: paginated([]) });
-    render(<AdminPage />);
+    const { container } = render(<AdminPage />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByText('◀'));
+    // CalendarGrid 내부 헤더 — fetch 완료 후 등장
+    const prevBtn = await screen.findByRole('button', { name: '이전 달' });
+    await user.click(prevBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/2026\.03\.01/)).toBeInTheDocument();
+      // 이전 달(3월) 1일 셀에 ring-primary-dark 적용 확인
+      const selectedCells = container.querySelectorAll('.ring-primary-dark');
+      const labels = Array.from(selectedCells).map((el) => el.textContent?.trim() ?? '');
+      expect(labels.some((t) => t === '1' || t.startsWith('1'))).toBe(true);
     });
   });
 
-  it('다음 달로 이동 시 해당 달 1일이 selectedDate로 설정된다', async () => {
+  it('다음 달로 이동 시 해당 달 1일이 selectedDate 로 설정된다 (셀 ring 적용)', async () => {
     setupLoggedIn();
     mockedAxios.get.mockResolvedValue({ data: paginated([]) });
-    render(<AdminPage />);
+    const { container } = render(<AdminPage />);
     const user = userEvent.setup();
 
-    await user.click(screen.getByText('▶'));
+    const nextBtn = await screen.findByRole('button', { name: '다음 달' });
+    await user.click(nextBtn);
 
     await waitFor(() => {
-      expect(screen.getByText(/2026\.05\.01/)).toBeInTheDocument();
+      const selectedCells = container.querySelectorAll('.ring-primary-dark');
+      const labels = Array.from(selectedCells).map((el) => el.textContent?.trim() ?? '');
+      expect(labels.some((t) => t === '1' || t.startsWith('1'))).toBe(true);
     });
   });
 
@@ -437,7 +450,7 @@ describe('AdminPage', () => {
       render(<AdminPage />);
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+      await user.click(screen.getByRole('button', { name: '리스트' }));
 
       await waitFor(() => {
         expect(mockedAxios.get).toHaveBeenCalledWith(
@@ -455,7 +468,7 @@ describe('AdminPage', () => {
       render(<AdminPage />);
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+      await user.click(screen.getByRole('button', { name: '리스트' }));
       await waitFor(() => {
         expect(mockedAxios.get).toHaveBeenCalledWith(
           expect.stringMatching(/\/current\/$/),
@@ -489,7 +502,7 @@ describe('AdminPage', () => {
       render(<AdminPage />);
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+      await user.click(screen.getByRole('button', { name: '리스트' }));
 
       await waitFor(() => {
         expect(
@@ -504,7 +517,7 @@ describe('AdminPage', () => {
       render(<AdminPage />);
       const user = userEvent.setup();
 
-      await user.click(screen.getByRole('button', { name: '리스트 보기' }));
+      await user.click(screen.getByRole('button', { name: '리스트' }));
 
       await waitFor(() => {
         expect(screen.getByText(/전체 예약/)).toBeInTheDocument();
@@ -523,7 +536,7 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('button', { name: '달력 보기' }),
+          screen.getByRole('button', { name: '달력' }),
         ).toBeInTheDocument();
       });
       expect(
@@ -539,7 +552,7 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('button', { name: '달력 보기' }),
+          screen.getByRole('button', { name: '달력' }),
         ).toBeInTheDocument();
       });
 
@@ -547,7 +560,7 @@ describe('AdminPage', () => {
 
       expect(screen.getByTestId('teams-section-mock')).toBeInTheDocument();
       expect(
-        screen.queryByRole('button', { name: '달력 보기' }),
+        screen.queryByRole('button', { name: '달력' }),
       ).not.toBeInTheDocument();
     });
 
@@ -559,7 +572,7 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('button', { name: '달력 보기' }),
+          screen.getByRole('button', { name: '달력' }),
         ).toBeInTheDocument();
       });
 
@@ -576,7 +589,7 @@ describe('AdminPage', () => {
 
       await waitFor(() => {
         expect(
-          screen.getByRole('button', { name: '달력 보기' }),
+          screen.getByRole('button', { name: '달력' }),
         ).toBeInTheDocument();
       });
 

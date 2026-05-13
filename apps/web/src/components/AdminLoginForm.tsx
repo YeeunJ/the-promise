@@ -38,7 +38,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
   }
 
   return (
-    <div className="min-h-screen bg-brand-cream flex items-center justify-center p-4">
+    <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
       <div className="bg-white rounded-xl shadow-md border border-[#E5E7EB] w-full max-w-sm px-8 py-10">
         <h1 className="text-2xl font-black text-black text-center mb-8">관리자 로그인</h1>
         <form onSubmit={handleSubmit} className="space-y-5">
@@ -51,7 +51,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-colors duration-200"
+              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors duration-200"
               autoComplete="username"
               required
             />
@@ -65,7 +65,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-brand-primary focus:ring-2 focus:ring-brand-primary/20 transition-colors duration-200"
+              className="w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-base focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-colors duration-200"
               autoComplete="current-password"
               required
             />
@@ -76,7 +76,7 @@ function AdminLoginForm({ onLoginSuccess }: AdminLoginFormProps): JSX.Element {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full rounded-xl bg-brand-primary px-4 py-3 text-base font-bold text-white hover:bg-brand-secondary disabled:bg-[#E5E7EB] disabled:cursor-not-allowed transition-colors duration-300"
+            className="w-full rounded-xl bg-primary px-4 py-3 text-base font-bold text-white hover:bg-primary-dark disabled:bg-[#E5E7EB] disabled:cursor-not-allowed transition-colors duration-300"
           >
             {isLoading ? '로그인 중...' : '로그인'}
           </button>

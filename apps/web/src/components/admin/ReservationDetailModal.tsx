@@ -1,11 +1,13 @@
 import { useEffect, useCallback } from 'react';
 import type { Reservation } from '../../types';
 import { extractDateStr, formatTime } from '../../utils/formatDatetime';
+import { isCancellable } from '../../lib/reservationUtils';
 import { StatusBadge } from '../ui/StatusBadge';
 
 interface ReservationDetailModalProps {
   reservation: Reservation | null;
   onClose: () => void;
+  onCancelRequest?: (reservationId: number) => void;
 }
 
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
@@ -32,7 +34,11 @@ function FieldRow({ label, value }: FieldRowProps): JSX.Element {
   );
 }
 
-export function ReservationDetailModal({ reservation, onClose }: ReservationDetailModalProps): JSX.Element | null {
+export function ReservationDetailModal({
+  reservation,
+  onClose,
+  onCancelRequest,
+}: ReservationDetailModalProps): JSX.Element | null {
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
@@ -53,9 +59,7 @@ export function ReservationDetailModal({ reservation, onClose }: ReservationDeta
     if (e.target === e.currentTarget) onClose();
   }
 
-  const teamDisplay = reservation.team
-    ? reservation.team.name
-    : (reservation.custom_team_name || reservation.applicant_team || '-');
+  const teamDisplay = reservation.applicant_team || reservation.custom_team_name || '-';
 
   return (
     <div
@@ -120,7 +124,16 @@ export function ReservationDetailModal({ reservation, onClose }: ReservationDeta
         </div>
 
         {/* 푸터 */}
-        <div className="px-6 py-4 border-t border-[#E5E7EB] flex justify-end">
+        <div className="px-6 py-4 border-t border-[#E5E7EB] flex justify-end gap-2">
+          {onCancelRequest !== undefined && isCancellable(reservation.status) && (
+            <button
+              type="button"
+              onClick={() => onCancelRequest(reservation.id)}
+              className="rounded-xl border border-danger/30 bg-danger/5 px-5 py-2 text-sm font-medium text-danger hover:bg-danger/10 transition-colors"
+            >
+              예약 취소
+            </button>
+          )}
           <button
             type="button"
             onClick={onClose}

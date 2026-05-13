@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import axios from 'axios';
-import type { PaginatedResponse, Reservation } from '../types';
+import type { PaginatedResponse, Reservation, ReservationStatus } from '../types';
 
 export interface PaginatedReservationsFilters {
   from_date?: string;
@@ -9,6 +9,7 @@ export interface PaginatedReservationsFilters {
   building_id?: number;
   search?: string;
   ordering?: string;
+  status?: ReservationStatus;
 }
 
 interface PublicCredentials {
@@ -53,8 +54,12 @@ function buildParams(
   if (filters.to_date) params.to_date = filters.to_date;
   if (typeof filters.space_id === 'number') params.space_id = filters.space_id;
   if (typeof filters.building_id === 'number') params.building_id = filters.building_id;
-  if (filters.search) params.search = filters.search;
+  if (typeof filters.search === 'string') {
+    const trimmed = filters.search.trim();
+    if (trimmed) params.search = trimmed;
+  }
   if (filters.ordering) params.ordering = filters.ordering;
+  if (filters.status) params.status = filters.status;
 
   return params;
 }
@@ -83,9 +88,14 @@ export function usePaginatedReservations(
   const credentialsKey = publicCredentials
     ? `${publicCredentials.name}|${publicCredentials.phone}`
     : '';
+  const abortRef = useRef<AbortController | null>(null);
 
   const doFetch = useCallback(async (): Promise<void> => {
     if (!enabled) return;
+
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
 
     setIsLoading(true);
     setError(null);
@@ -99,23 +109,32 @@ export function usePaginatedReservations(
       const response = await axios.get<PaginatedResponse<Reservation>>(endpoint, {
         headers,
         params: requestParams,
+        signal: controller.signal,
       });
+
+      if (controller.signal.aborted) return;
 
       setResults(response.data.results);
       setCount(response.data.count);
       setResponsePage(response.data.page);
       setTotalPages(response.data.total_pages);
-    } catch {
+    } catch (err: unknown) {
+      if (controller.signal.aborted || axios.isCancel(err)) return;
       setError('예약 목록을 불러오는 데 실패했습니다.');
       setResults([]);
     } finally {
-      setIsLoading(false);
+      if (abortRef.current === controller) {
+        setIsLoading(false);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, authToken, credentialsKey, filtersKey, page, pageSize, enabled]);
 
   useEffect(() => {
     void doFetch();
+    return () => {
+      abortRef.current?.abort();
+    };
   }, [doFetch]);
 
   return {

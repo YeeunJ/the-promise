@@ -46,7 +46,7 @@ export function Pagination({
   const baseBtnClass =
     'min-w-[36px] h-9 px-2 text-sm rounded-lg border border-[#E5E7EB] bg-white hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50 transition-colors';
   const currentBtnClass =
-    'min-w-[36px] h-9 px-2 text-sm rounded-lg bg-brand-primary text-white font-semibold';
+    'min-w-[36px] h-9 px-2 text-sm rounded-lg bg-primary text-white font-semibold';
 
   return (
     <nav

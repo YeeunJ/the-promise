@@ -28,8 +28,8 @@ export function SectionTabs({ active, onChange }: SectionTabsProps): JSX.Element
             aria-current={isActive ? 'page' : undefined}
             className={`px-4 py-2 text-sm font-medium rounded-t-lg border-b-2 transition-colors duration-200 ${
               isActive
-                ? 'border-brand-primary text-brand-primary bg-white'
-                : 'border-transparent text-gray-600 hover:text-brand-primary'
+                ? 'border-primary text-primary bg-white'
+                : 'border-transparent text-gray-600 hover:text-primary'
             }`}
           >
             {tab.label}

@@ -14,6 +14,7 @@ import {
 import { SpaceListTable } from './SpaceListTable';
 import { SpaceFormModal } from './SpaceFormModal';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
+import { SectionHeader } from '../SectionHeader';
 
 interface SpacesSectionProps {
   authToken: string;
@@ -122,22 +123,26 @@ export function SpacesSection({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-black">공간 관리</h2>
-        <button
-          type="button"
-          onClick={handleAdd}
-          disabled={buildings.length === 0}
-          className="bg-brand-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-          title={
-            buildings.length === 0
-              ? '먼저 건물을 등록해야 공간을 추가할 수 있습니다.'
-              : undefined
-          }
-        >
-          + 공간 추가
-        </button>
-      </div>
+      <SectionHeader
+        title="공간 관리"
+        subtitle={isLoading ? undefined : `전체 ${String(spaces.length)}개`}
+        actions={
+          <button
+            type="button"
+            onClick={handleAdd}
+            disabled={buildings.length === 0}
+            className="bg-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            title={
+              buildings.length === 0
+                ? '먼저 건물을 등록해야 공간을 추가할 수 있습니다.'
+                : undefined
+            }
+          >
+            + 공간 추가
+          </button>
+        }
+      />
+
 
       {spacesError !== null && (
         <div

@@ -1,6 +1,13 @@
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Reservation } from '../../types/index';
 import { extractDateStr, getKSTDateString } from '../../utils/formatDatetime';
 import { getBuildingColor } from '../../lib/adminConstants';
+
+interface EventStats {
+  total: number;
+  confirmed: number;
+  pending: number;
+}
 
 interface CalendarGridProps {
   currentYear: number;
@@ -8,6 +15,11 @@ interface CalendarGridProps {
   reservations: Reservation[];
   selectedDate: string | null;
   onDateSelect: (date: string) => void;
+  onPrevMonth?: () => void;
+  onNextMonth?: () => void;
+  onGoToday?: () => void;
+  onReservationClick?: (reservation: Reservation) => void;
+  eventStats?: EventStats;
 }
 
 const DAY_HEADERS = ['일', '월', '화', '수', '목', '금', '토'] as const;
@@ -17,7 +29,8 @@ const DAY_HEADER_COLOR: Record<number, string> = {
   6: 'text-[#3B82F6]',
 };
 
-const CHIP_BASE = 'flex items-center px-2.5 py-1 rounded-md text-xs font-medium truncate transition-colors duration-150 cursor-pointer border-l-[3px]';
+const CHIP_BASE =
+  'flex items-center px-2.5 py-1 rounded-md text-xs font-medium truncate transition-colors duration-150 cursor-pointer border-l-[3px] hover:brightness-95';
 
 function buildCalendarDays(year: number, month: number): (number | null)[] {
   const firstDay = new Date(year, month - 1, 1).getDay();
@@ -39,7 +52,12 @@ function groupByDate(reservations: Reservation[]): Map<string, Reservation[]> {
   return map;
 }
 
-function renderChips(dayReservations: Reservation[]): JSX.Element {
+interface ChipsProps {
+  dayReservations: Reservation[];
+  onReservationClick?: (reservation: Reservation) => void;
+}
+
+function Chips({ dayReservations, onReservationClick }: ChipsProps): JSX.Element {
   const visible = dayReservations.slice(0, 3);
   const remaining = dayReservations.length - 3;
 
@@ -48,17 +66,22 @@ function renderChips(dayReservations: Reservation[]): JSX.Element {
       {visible.map((r) => {
         const color = getBuildingColor(r.space.building.name);
         return (
-          <span
+          <button
             key={r.id}
+            type="button"
             className={CHIP_BASE}
             style={{ backgroundColor: color.bg, borderLeftColor: color.main }}
+            onClick={(e) => {
+              e.stopPropagation();
+              onReservationClick?.(r);
+            }}
           >
             {r.applicant_team || '-'} - {r.space.name}
-          </span>
+          </button>
         );
       })}
       {remaining > 0 && (
-        <span className="text-xs text-brand-accent font-medium pl-1">
+        <span className="text-xs text-accent font-medium pl-1">
           +{remaining} more
         </span>
       )}
@@ -72,13 +95,71 @@ function CalendarGrid({
   reservations,
   selectedDate,
   onDateSelect,
+  onPrevMonth,
+  onNextMonth,
+  onGoToday,
+  onReservationClick,
+  eventStats,
 }: CalendarGridProps): JSX.Element {
   const today = getKSTDateString();
   const days = buildCalendarDays(currentYear, currentMonth);
   const byDate = groupByDate(reservations);
 
+  const showHeader =
+    onPrevMonth !== undefined ||
+    onNextMonth !== undefined ||
+    onGoToday !== undefined ||
+    eventStats !== undefined;
+
   return (
     <div className="bg-white rounded-xl shadow-md border border-[#E5E7EB] overflow-hidden">
+      {/* 내부 헤더 — 월 + nav + 이벤트 stats */}
+      {showHeader && (
+        <div className="flex items-center justify-between px-5 py-3 border-b border-[#E5E7EB]">
+          <div className="flex items-center gap-3">
+            <div className="text-base font-extrabold tracking-tight">
+              {String(currentMonth)}월
+            </div>
+            <div className="flex items-center gap-1">
+              {onPrevMonth !== undefined && (
+                <button
+                  type="button"
+                  aria-label="이전 달"
+                  onClick={onPrevMonth}
+                  className="w-7 h-7 rounded-md bg-surface-2 hover:bg-edge-soft grid place-items-center text-ink-soft"
+                >
+                  <ChevronLeft size={14} />
+                </button>
+              )}
+              {onGoToday !== undefined && (
+                <button
+                  type="button"
+                  onClick={onGoToday}
+                  className="px-2.5 h-7 rounded-md bg-surface-2 hover:bg-edge-soft text-xs font-semibold text-ink-soft"
+                >
+                  오늘
+                </button>
+              )}
+              {onNextMonth !== undefined && (
+                <button
+                  type="button"
+                  aria-label="다음 달"
+                  onClick={onNextMonth}
+                  className="w-7 h-7 rounded-md bg-surface-2 hover:bg-edge-soft grid place-items-center text-ink-soft"
+                >
+                  <ChevronRight size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          {eventStats !== undefined && (
+            <div className="text-[11px] font-semibold text-ink-mute tabular-nums">
+              이벤트 {eventStats.total}개 · 확정 {eventStats.confirmed} · 대기 {eventStats.pending}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* 요일 헤더 */}
       <div className="grid grid-cols-7 border-b border-[#E5E7EB]">
         {DAY_HEADERS.map((label, idx) => (
@@ -97,7 +178,7 @@ function CalendarGrid({
           if (day === null) {
             return (
               <div
-                key={`empty-${idx}`}
+                key={`empty-${String(idx)}`}
                 className="min-h-[120px] p-2 bg-[#FAFAF8]"
               />
             );
@@ -114,19 +195,21 @@ function CalendarGrid({
           const colIndex = idx % 7;
           const dayReservations = byDate.get(dateStr) ?? [];
 
-          let cellClass = 'min-h-[120px] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
+          let cellClass =
+            'min-h-[120px] p-2 flex flex-col gap-1.5 cursor-pointer transition-colors';
           if (isToday) {
-            cellClass += ' bg-brand-primary/5 ring-1 ring-inset ring-brand-primary/30';
+            cellClass += ' bg-primary/5 ring-1 ring-inset ring-primary/30';
           } else {
             cellClass += ' hover:bg-gray-50';
           }
           if (isSelected) {
-            cellClass += ' ring-2 ring-brand-secondary';
+            cellClass += ' ring-2 ring-primary-dark';
           }
 
           let dateNumClass = 'text-sm font-medium self-start';
           if (isToday) {
-            dateNumClass = 'w-7 h-7 flex items-center justify-center rounded-full bg-brand-primary text-white font-bold text-sm';
+            dateNumClass =
+              'w-7 h-7 flex items-center justify-center rounded-full bg-primary text-white font-bold text-sm';
           } else if (colIndex === 0) {
             dateNumClass += ' text-[#DC2626]';
           } else if (colIndex === 6) {
@@ -142,7 +225,10 @@ function CalendarGrid({
               onClick={() => onDateSelect(dateStr)}
             >
               <span className={dateNumClass}>{day}</span>
-              {renderChips(dayReservations)}
+              <Chips
+                dayReservations={dayReservations}
+                onReservationClick={onReservationClick}
+              />
             </div>
           );
         })}

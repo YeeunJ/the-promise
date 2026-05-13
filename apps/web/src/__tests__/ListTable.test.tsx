@@ -144,8 +144,9 @@ describe('ListTable', () => {
     });
   });
 
-  describe('정렬', () => {
-    it('날짜순 오름차순으로 정렬한다', () => {
+  describe('정렬 (서버 위임)', () => {
+    // 정렬은 백엔드 ordering 파라미터가 책임. 컴포넌트는 받은 순서를 그대로 렌더한다.
+    it('받은 reservations 순서를 그대로 유지한다 (클라이언트 측 재정렬 없음)', () => {
       const reservations = [
         makeReservation({ id: 1, start_datetime: '2026-04-18T10:00:00+09:00', end_datetime: '2026-04-18T12:00:00+09:00' }),
         makeReservation({ id: 2, start_datetime: '2026-04-16T10:00:00+09:00', end_datetime: '2026-04-16T12:00:00+09:00' }),
@@ -154,23 +155,107 @@ describe('ListTable', () => {
 
       render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
-      const rows = screen.getAllByRole('row').slice(1); // 헤더 제외
-      expect(within(rows[0]).getByText('04.16')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('04.17')).toBeInTheDocument();
-      expect(within(rows[2]).getByText('04.18')).toBeInTheDocument();
+      const rows = screen.getAllByRole('row').slice(1);
+      expect(within(rows[0]).getByText('04.18')).toBeInTheDocument();
+      expect(within(rows[1]).getByText('04.16')).toBeInTheDocument();
+      expect(within(rows[2]).getByText('04.17')).toBeInTheDocument();
+    });
+  });
+
+  describe('정렬 헤더 토글', () => {
+    it('"날짜" 헤더가 버튼 컨트롤을 가진다 (ordering prop 있을 때)', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="-start_datetime"
+          onOrderingChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: /날짜/ })).toBeInTheDocument();
     });
 
-    it('같은 날짜 내에서 start_datetime 오름차순으로 정렬한다', () => {
-      const reservations = [
-        makeReservation({ id: 1, start_datetime: '2026-04-16T14:00:00+09:00', end_datetime: '2026-04-16T16:00:00+09:00' }),
-        makeReservation({ id: 2, start_datetime: '2026-04-16T09:00:00+09:00', end_datetime: '2026-04-16T11:00:00+09:00' }),
-      ];
+    it('ordering="-start_datetime" 이면 ↓ 아이콘이 표시되고 aria-sort=descending', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="-start_datetime"
+          onOrderingChange={vi.fn()}
+        />,
+      );
 
-      render(<ListTable reservations={reservations} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
+      expect(screen.getByRole('button', { name: /날짜/ })).toHaveTextContent('↓');
+      expect(
+        screen.getByRole('columnheader', { name: /날짜/ }),
+      ).toHaveAttribute('aria-sort', 'descending');
+    });
 
-      const rows = screen.getAllByRole('row').slice(1);
-      expect(within(rows[0]).getByText('09:00-11:00')).toBeInTheDocument();
-      expect(within(rows[1]).getByText('14:00-16:00')).toBeInTheDocument();
+    it('ordering="start_datetime" 이면 ↑ 아이콘이 표시되고 aria-sort=ascending', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="start_datetime"
+          onOrderingChange={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByRole('button', { name: /날짜/ })).toHaveTextContent('↑');
+      expect(
+        screen.getByRole('columnheader', { name: /날짜/ }),
+      ).toHaveAttribute('aria-sort', 'ascending');
+    });
+
+    it('"날짜" 헤더 클릭 시 ordering 이 desc → asc 로 토글된다', async () => {
+      const handle = vi.fn();
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="-start_datetime"
+          onOrderingChange={handle}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /날짜/ }));
+      expect(handle).toHaveBeenCalledWith('start_datetime');
+    });
+
+    it('"날짜" 헤더 클릭 시 ordering 이 asc → desc 로 토글된다', async () => {
+      const handle = vi.fn();
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="start_datetime"
+          onOrderingChange={handle}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /날짜/ }));
+      expect(handle).toHaveBeenCalledWith('-start_datetime');
+    });
+
+    it('ordering prop 이 없으면 "날짜" 헤더는 일반 텍스트로 표시된다 (버튼 없음)', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+        />,
+      );
+
+      expect(
+        screen.queryByRole('button', { name: /날짜/ }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('날짜')).toBeInTheDocument();
     });
   });
 
@@ -240,6 +325,53 @@ describe('ListTable', () => {
       expect(screen.getByText('대기')).toBeInTheDocument();
       expect(screen.getByText('거절')).toBeInTheDocument();
       expect(screen.getByText('취소')).toBeInTheDocument();
+    });
+  });
+
+  describe('빈 결과 메시지', () => {
+    it('reservations 가 0건이고 searchQuery 가 없으면 기본 안내가 표시된다', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByText('조회된 예약이 없습니다.')).toBeInTheDocument();
+    });
+
+    it('reservations 가 0건이고 searchQuery 가 있으면 검색어를 노출한 메시지를 표시한다', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          searchQuery="홍길동"
+        />,
+      );
+
+      expect(
+        screen.getByText("검색어 '홍길동'에 해당하는 예약이 없습니다."),
+      ).toBeInTheDocument();
+    });
+
+    it('reservations 가 1건 이상이면 빈 결과 메시지를 표시하지 않는다', () => {
+      render(
+        <ListTable
+          reservations={[makeReservation()]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          searchQuery="홍길동"
+        />,
+      );
+
+      expect(
+        screen.queryByText("검색어 '홍길동'에 해당하는 예약이 없습니다."),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('조회된 예약이 없습니다.'),
+      ).not.toBeInTheDocument();
     });
   });
 

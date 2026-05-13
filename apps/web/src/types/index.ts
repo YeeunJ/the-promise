@@ -27,7 +27,7 @@ export interface Reservation {
   applicant_name: string;
   applicant_phone: string;
   applicant_team: string;
-  team: ApiTeam | null;
+  team: number | null;
   custom_team_name: string | null;
   leader_phone: string;
   headcount: number;

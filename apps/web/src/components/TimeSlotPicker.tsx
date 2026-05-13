@@ -67,7 +67,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
   }
 
   function getSlotStyle(slot: string): string {
-    const base = 'px-2 py-1 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-brand-primary/20';
+    const base = 'px-2 py-1 text-sm rounded-lg border transition-colors focus:outline-none focus:ring-2 focus:ring-primary/20';
 
     // endTime 선택 중(startTime만 있는 상태)에서 startTime 이전 슬롯 비활성화
     const isSelectingEnd = value.startTime && !value.endTime;
@@ -76,7 +76,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
     }
 
     if (slot === value.startTime) {
-      return `${base} bg-brand-primary text-white border-brand-primary cursor-pointer`;
+      return `${base} bg-primary text-white border-primary cursor-pointer`;
     }
 
     if (slot === value.endTime) {
@@ -84,7 +84,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
     }
 
     if (value.startTime && value.endTime && slot > value.startTime && slot < value.endTime) {
-      return `${base} bg-brand-primary/10 text-brand-primary border-brand-primary/30 cursor-pointer`;
+      return `${base} bg-primary/10 text-primary border-primary/30 cursor-pointer`;
     }
 
     return `${base} bg-white text-gray-700 border-gray-300 hover:bg-gray-50 cursor-pointer`;
@@ -113,7 +113,7 @@ function TimeSlotPicker({ spaceId, value, onChange }: TimeSlotPickerProps): JSX.
           value={value.date}
           onChange={handleDateChange}
           disabled={isDateDisabled}
-          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary ${
+          className={`w-full px-3 py-2 border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary ${
             isDateDisabled
               ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
               : 'bg-white text-gray-900 border-gray-300'

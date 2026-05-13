@@ -250,6 +250,117 @@ describe('usePaginatedReservations', () => {
     });
   });
 
+  it('search 가 공백뿐이면 search 파라미터를 전송하지 않는다 (trim)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: paginated([]) });
+
+    renderHook(() =>
+      usePaginatedReservations({
+        endpoint: '/api/v1/admin/reservations/current/',
+        filters: { search: '   ' },
+        page: 1,
+        pageSize: 20,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedAxios.get).toHaveBeenCalled();
+    });
+
+    const [, config] = mockedAxios.get.mock.calls[0];
+    expect(config?.params).not.toHaveProperty('search');
+  });
+
+  it('search 양옆 공백은 제거해서 전송한다 (trim)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: paginated([]) });
+
+    renderHook(() =>
+      usePaginatedReservations({
+        endpoint: '/api/v1/admin/reservations/current/',
+        filters: { search: '  홍길동  ' },
+        page: 1,
+        pageSize: 20,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedAxios.get).toHaveBeenCalled();
+    });
+
+    const [, config] = mockedAxios.get.mock.calls[0];
+    expect(config?.params).toMatchObject({ search: '홍길동' });
+  });
+
+  it('axios 호출에 AbortSignal 을 전달한다 (race condition 방지)', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: paginated([]) });
+
+    renderHook(() =>
+      usePaginatedReservations({
+        endpoint: '/api/v1/admin/reservations/current/',
+        filters: {},
+        page: 1,
+        pageSize: 20,
+      }),
+    );
+
+    await waitFor(() => {
+      expect(mockedAxios.get).toHaveBeenCalled();
+    });
+
+    const [, config] = mockedAxios.get.mock.calls[0];
+    expect(config?.signal).toBeInstanceOf(AbortSignal);
+  });
+
+  it('빠르게 filters 가 변경되면 이전 요청을 abort 한다', async () => {
+    // 첫 호출은 응답 보류
+    let pendingReject: ((err: unknown) => void) | undefined;
+    mockedAxios.get
+      .mockImplementationOnce(
+        () =>
+          new Promise((_resolve, reject) => {
+            pendingReject = reject;
+          }) as Promise<{ data: PaginatedResponse<Reservation> }>,
+      )
+      .mockResolvedValueOnce({ data: paginated([makeReservation(99)]) });
+
+    const { result, rerender } = renderHook(
+      (props: { search: string }) =>
+        usePaginatedReservations({
+          endpoint: '/api/v1/admin/reservations/current/',
+          filters: { search: props.search },
+          page: 1,
+          pageSize: 20,
+        }),
+      { initialProps: { search: '김' } },
+    );
+
+    await waitFor(() => {
+      expect(mockedAxios.get).toHaveBeenCalledTimes(1);
+    });
+
+    const firstSignal = mockedAxios.get.mock.calls[0][1]?.signal as
+      | AbortSignal
+      | undefined;
+    expect(firstSignal?.aborted).toBe(false);
+
+    // 두 번째 입력 — 이전 요청을 abort 해야 함
+    rerender({ search: '김민' });
+
+    await waitFor(() => {
+      expect(firstSignal?.aborted).toBe(true);
+    });
+
+    // 첫 번째 요청은 abort 에러로 종료 처리 (state 오염 없게)
+    pendingReject?.({ name: 'CanceledError', message: 'canceled' });
+
+    await waitFor(() => {
+      expect(mockedAxios.get).toHaveBeenCalledTimes(2);
+    });
+
+    await waitFor(() => {
+      expect(result.current.results).toEqual([makeReservation(99)]);
+    });
+  });
+
   it('refetch() 호출 시 동일 params 로 재호출한다', async () => {
     mockedAxios.get.mockResolvedValue({ data: paginated([]) });
 

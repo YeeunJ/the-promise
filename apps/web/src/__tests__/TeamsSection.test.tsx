@@ -56,7 +56,8 @@ describe('TeamsSection', () => {
     await waitFor(() => {
       expect(screen.getByText('대림1')).toBeInTheDocument();
     });
-    expect(screen.getByText('1교구')).toBeInTheDocument();
+    // '1교구' 는 chip 필터 button 과 테이블 cell 양쪽에 등장 가능
+    expect(screen.getAllByText('1교구').length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('이상윤 목사')).toBeInTheDocument();
   });
 

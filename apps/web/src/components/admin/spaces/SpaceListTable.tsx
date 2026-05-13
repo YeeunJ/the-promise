@@ -54,7 +54,7 @@ export function SpaceListTable({
                   <button
                     type="button"
                     onClick={() => onEdit(space)}
-                    className="text-sm font-medium text-brand-primary hover:underline"
+                    className="text-sm font-medium text-primary hover:underline"
                     aria-label={`${space.name} 수정`}
                   >
                     수정

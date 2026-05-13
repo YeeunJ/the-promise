@@ -168,8 +168,8 @@ describe('CalendarGrid', () => {
         onDateSelect={vi.fn()}
       />
     );
-    // ring-2 ring-brand-secondary 클래스가 적용된 셀이 존재해야 함
-    const selectedCell = container.querySelector('.ring-brand-secondary');
+    // ring-2 ring-primary-dark 클래스가 적용된 셀이 존재해야 함
+    const selectedCell = container.querySelector('.ring-primary-dark');
     expect(selectedCell).toBeInTheDocument();
   });
 
@@ -275,7 +275,7 @@ describe('CalendarGrid', () => {
       />
     );
     // 칩의 인라인 스타일에 본당 메인 컬러(#2563EB) border가 있어야 함
-    const chip = screen.getByText('청년부 - 세미나실').closest('span');
+    const chip = screen.getByText('청년부 - 세미나실').closest('button');
     expect(chip).toBeTruthy();
     // jsdom converts hex to rgb
     expect(chip!.style.borderLeftColor).toBe('rgb(37, 99, 235)');
@@ -305,7 +305,7 @@ describe('CalendarGrid', () => {
         onDateSelect={vi.fn()}
       />
     );
-    const chip = screen.getByText('찬양팀 - 소예배실').closest('span');
+    const chip = screen.getByText('찬양팀 - 소예배실').closest('button');
     expect(chip).toBeTruthy();
     expect(chip!.style.borderLeftColor).toBe('rgb(5, 150, 105)');
     expect(chip!.style.backgroundColor).toBe('rgb(236, 253, 245)');
@@ -359,7 +359,7 @@ describe('CalendarGrid', () => {
         onDateSelect={vi.fn()}
       />
     );
-    const chip = screen.getByText('행정팀 - 회의실').closest('span');
+    const chip = screen.getByText('행정팀 - 회의실').closest('button');
     expect(chip).toBeTruthy();
     // 기본 컬러: main=#6B7280, bg=#F9FAFB (jsdom converts to rgb)
     expect(chip!.style.borderLeftColor).toBe('rgb(107, 114, 128)');

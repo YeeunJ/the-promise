@@ -55,7 +55,7 @@ export function TeamListTable({
                   <button
                     type="button"
                     onClick={() => onEdit(team)}
-                    className="text-sm font-medium text-brand-primary hover:underline"
+                    className="text-sm font-medium text-primary hover:underline"
                     aria-label={`${team.name} 수정`}
                   >
                     수정

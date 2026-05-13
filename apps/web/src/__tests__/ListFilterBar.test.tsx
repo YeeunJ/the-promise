@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { ListFilterBar } from '../components/admin/ListFilterBar';
 import type { Space } from '../types';
@@ -73,7 +73,7 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
     expect(screen.getByRole('button', { name: '장소 필터' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: '기간 필터' })).toBeInTheDocument();
     expect(
-      screen.getByPlaceholderText('신청자 이름 검색'),
+      screen.getByPlaceholderText('이름·전화 검색'),
     ).toBeInTheDocument();
   });
 
@@ -219,42 +219,120 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
     });
   });
 
-  // --- 검색 입력 ---
+  // --- 검색 입력 (디바운스 적용) ---
 
   describe('검색', () => {
-    it('search 입력 변경 시 onFiltersChange({...filters, search}) 호출', async () => {
+    it('검색 input에 aria-label "이름·전화 검색" 이 설정된다', () => {
+      render(<ListFilterBar {...createDefaultProps()} />);
+      expect(
+        screen.getByRole('searchbox', { name: '이름·전화 검색' }),
+      ).toBeInTheDocument();
+    });
+
+    it('isLoading=true 라도 검색 input은 비활성화되지 않는다 (IME 끊김 방지)', () => {
+      render(
+        <ListFilterBar {...createDefaultProps({ isLoading: true })} />,
+      );
+      const input = screen.getByPlaceholderText('이름·전화 검색');
+      expect(input).not.toBeDisabled();
+    });
+
+    it('isLoading=true 일 때 검색 spinner 가 표시된다', () => {
+      render(
+        <ListFilterBar {...createDefaultProps({ isLoading: true })} />,
+      );
+      expect(screen.getByTestId('search-spinner')).toBeInTheDocument();
+    });
+
+    it('250ms 이내에 추가 입력이 오면 onFiltersChange 가 호출되지 않는다', () => {
+      const onFiltersChange = vi.fn();
+      render(
+        <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
+      );
+
+      const input = screen.getByPlaceholderText('이름·전화 검색');
+      fireEvent.change(input, { target: { value: '홍' } });
+
+      act(() => {
+        vi.advanceTimersByTime(249);
+      });
+
+      expect(onFiltersChange).not.toHaveBeenCalled();
+    });
+
+    it('250ms 정지 후 onFiltersChange 가 마지막 입력값으로 한 번만 호출된다', async () => {
       const onFiltersChange = vi.fn();
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
         <ListFilterBar {...createDefaultProps({ onFiltersChange })} />,
       );
 
-      const input = screen.getByPlaceholderText('신청자 이름 검색');
-      await user.type(input, '홍');
+      const input = screen.getByPlaceholderText('이름·전화 검색');
+      await user.type(input, '홍길동');
 
-      const lastCall = onFiltersChange.mock.calls.at(-1);
-      expect(lastCall?.[0]).toMatchObject({ search: '홍' });
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      expect(onFiltersChange).toHaveBeenCalledTimes(1);
+      expect(onFiltersChange.mock.calls[0][0]).toMatchObject({
+        search: '홍길동',
+      });
     });
 
-    it('search 가 빈 문자열로 비워지면 search 키가 빠지거나 빈 문자열로 통보된다', async () => {
+    it('공백만 입력하면 디바운스 후 search 가 undefined 로 전달된다 (trim)', async () => {
       const onFiltersChange = vi.fn();
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
         <ListFilterBar
           {...createDefaultProps({
-            filters: { search: '홍', from_date: '2026-04-16', to_date: '2026-04-23' },
+            filters: {
+              search: '홍',
+              from_date: '2026-04-16',
+              to_date: '2026-04-23',
+            },
             onFiltersChange,
           })}
         />,
       );
 
-      const input = screen.getByPlaceholderText('신청자 이름 검색');
+      const input = screen.getByPlaceholderText('이름·전화 검색');
       await user.clear(input);
+      await user.type(input, '   ');
+
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
 
       const lastCall = onFiltersChange.mock.calls.at(-1);
-      const arg = lastCall?.[0];
-      // 빈 문자열은 hook 의 buildParams 에서 제외됨 → 명세 상 빈 문자열 OK
-      expect(arg.search === '' || arg.search === undefined).toBe(true);
+      expect(lastCall?.[0].search).toBeUndefined();
+    });
+
+    it('비워서 빈 문자열이 되면 디바운스 후 search 가 undefined 로 전달된다', async () => {
+      const onFiltersChange = vi.fn();
+      const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+      render(
+        <ListFilterBar
+          {...createDefaultProps({
+            filters: {
+              search: '홍',
+              from_date: '2026-04-16',
+              to_date: '2026-04-23',
+            },
+            onFiltersChange,
+          })}
+        />,
+      );
+
+      const input = screen.getByPlaceholderText('이름·전화 검색');
+      await user.clear(input);
+
+      act(() => {
+        vi.advanceTimersByTime(250);
+      });
+
+      const lastCall = onFiltersChange.mock.calls.at(-1);
+      expect(lastCall?.[0].search).toBeUndefined();
     });
   });
 
