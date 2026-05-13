@@ -16,6 +16,7 @@ import {
 import { BuildingListTable } from './BuildingListTable';
 import { BuildingFormModal } from './BuildingFormModal';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
+import { SectionHeader } from '../SectionHeader';
 
 interface BuildingsSectionProps {
   authToken: string;
@@ -117,16 +118,20 @@ export function BuildingsSection({
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-bold text-black">건물 관리</h2>
-        <button
-          type="button"
-          onClick={handleAdd}
-          className="bg-brand-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          + 건물 추가
-        </button>
-      </div>
+      <SectionHeader
+        title="건물 관리"
+        subtitle={isLoading ? undefined : `전체 ${String(buildings.length)}동`}
+        actions={
+          <button
+            type="button"
+            onClick={handleAdd}
+            className="bg-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity"
+          >
+            + 건물 추가
+          </button>
+        }
+      />
+
 
       {error !== null && (
         <div

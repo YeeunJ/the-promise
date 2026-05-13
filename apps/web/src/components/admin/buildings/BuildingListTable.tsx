@@ -44,7 +44,7 @@ export function BuildingListTable({
                   <button
                     type="button"
                     onClick={() => onEdit(building)}
-                    className="text-sm font-medium text-brand-primary hover:underline"
+                    className="text-sm font-medium text-primary hover:underline"
                     aria-label={`${building.name} 수정`}
                   >
                     수정

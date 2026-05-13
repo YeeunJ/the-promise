@@ -8,8 +8,8 @@ const STATUS_LABEL: Record<ReservationStatus, string> = {
 };
 
 const STATUS_CLASS: Record<ReservationStatus, string> = {
-  confirmed: 'bg-brand-primary/10 text-brand-primary border border-brand-primary/30',
-  pending: 'bg-brand-secondary/10 text-brand-secondary border border-brand-secondary/30',
+  confirmed: 'bg-primary/10 text-primary border border-primary/30',
+  pending: 'bg-primary-dark/10 text-primary-dark border border-primary-dark/30',
   rejected: 'bg-[#DC2626]/10 text-[#DC2626] border border-[#DC2626]/30',
   cancelled: 'bg-[#E5E7EB] text-gray-600 border border-gray-300',
 };

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { formatDatetimeRange } from '../utils/formatDatetime';
 import { formatSpaceName, formatSpaceNameParts } from '../utils/formatSpaceName';
-import { StatusBadge } from './ui/StatusBadge';
+import { StatusPill } from './ui/StatusPill';
 import type { Reservation } from '../types/index';
 
 interface Credentials {
@@ -16,6 +16,7 @@ interface ReservationTableProps {
   credentials: Credentials;
   onGoToApply: () => void;
   onCancelSuccess: () => void;
+  onRowClick?: (reservation: Reservation) => void;
 }
 
 async function downloadTicket(reservationId: number, credentials: Credentials): Promise<void> {
@@ -105,7 +106,7 @@ function TicketButton({
             ? 'bg-red-100 text-red-600 hover:bg-red-200'
             : isSuccess
             ? 'bg-green-100 text-green-600'
-            : 'bg-brand-primary/10 text-brand-primary hover:bg-brand-primary/20 disabled:opacity-50'
+            : 'bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-50'
         }`}
       >
         {TICKET_LABEL_MAP[state]}
@@ -239,7 +240,7 @@ function EmptyState({ onGoToApply }: { onGoToApply: () => void }): JSX.Element {
       <button
         type="button"
         onClick={onGoToApply}
-        className="inline-flex items-center gap-1 text-sm font-medium text-brand-primary hover:text-brand-secondary transition-colors"
+        className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:text-primary-dark transition-colors"
       >
         예약 신청하러 가기 →
       </button>
@@ -267,8 +268,8 @@ function ReservationCard({
   return (
     <div className="bg-white border border-[#E5E7EB] rounded-xl p-4 shadow-sm space-y-2 overflow-hidden">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-brand-accent">No. {reservation.id}</span>
-        <StatusBadge status={reservation.status} />
+        <span className="text-xs text-accent">No. {reservation.id}</span>
+        <StatusPill status={reservation.status} />
       </div>
       <div>
         <p className="text-sm font-medium text-black">
@@ -303,10 +304,12 @@ function ReservationList({
   reservations,
   credentials,
   onCancelSuccess,
+  onRowClick,
 }: {
   reservations: Reservation[];
   credentials: Credentials;
   onCancelSuccess: () => void;
+  onRowClick?: (reservation: Reservation) => void;
 }): JSX.Element {
   return (
     <>
@@ -327,28 +330,28 @@ function ReservationList({
         <table className="w-full min-w-[900px] table-fixed divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[6%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[6%]">
                 번호
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[15%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[15%]">
                 공간
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[22%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[22%]">
                 날짜·시간
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[7%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[7%]">
                 인원
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[24%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[24%]">
                 사용목적
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[8%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[8%]">
                 상태
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[10%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[10%]">
                 티켓
               </th>
-              <th className="px-4 py-3 text-center text-xs font-medium text-brand-accent uppercase tracking-wider w-[8%]">
+              <th className="px-4 py-3 text-center text-xs font-medium text-accent uppercase tracking-wider w-[8%]">
                 취소
               </th>
             </tr>
@@ -356,9 +359,17 @@ function ReservationList({
           <tbody className="bg-white divide-y divide-gray-200">
             {reservations.map((reservation) => {
               const { buildingFloor, roomName } = formatSpaceNameParts(reservation.space);
+              const isClickable = onRowClick !== undefined;
               return (
-              <tr key={reservation.id} className="h-[72px] hover:bg-gray-50">
-                <td className="px-4 py-3 text-sm text-brand-accent text-center align-middle">
+              <tr
+                key={reservation.id}
+                className={
+                  'h-[72px] hover:bg-gray-50 ' +
+                  (isClickable ? 'cursor-pointer' : '')
+                }
+                onClick={isClickable ? () => onRowClick(reservation) : undefined}
+              >
+                <td className="px-4 py-3 text-sm text-accent text-center align-middle">
                   {reservation.id}
                 </td>
                 <td className="px-4 py-3 text-sm text-black text-center align-middle overflow-hidden">
@@ -378,16 +389,22 @@ function ReservationList({
                   <div className="line-clamp-2">{reservation.purpose}</div>
                 </td>
                 <td className="px-4 py-3 text-sm text-center align-middle whitespace-nowrap">
-                  <StatusBadge status={reservation.status} />
+                  <StatusPill status={reservation.status} />
                 </td>
-                <td className="px-4 py-3 text-sm text-center align-middle">
+                <td
+                  className="px-4 py-3 text-sm text-center align-middle"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <TicketButton
                     reservationId={reservation.id}
                     credentials={credentials}
                     status={reservation.status}
                   />
                 </td>
-                <td className="px-4 py-3 text-sm text-center align-middle">
+                <td
+                  className="px-4 py-3 text-sm text-center align-middle"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <CancelButton
                     reservationId={reservation.id}
                     status={reservation.status}
@@ -411,6 +428,7 @@ function ReservationTable({
   credentials,
   onGoToApply,
   onCancelSuccess,
+  onRowClick,
 }: ReservationTableProps): JSX.Element {
   const [showPast, setShowPast] = useState(false);
 
@@ -431,6 +449,7 @@ function ReservationTable({
             reservations={upcoming}
             credentials={credentials}
             onCancelSuccess={onCancelSuccess}
+            onRowClick={onRowClick}
           />
         </>
       )}
@@ -459,6 +478,7 @@ function ReservationTable({
                 reservations={past}
                 credentials={credentials}
                 onCancelSuccess={onCancelSuccess}
+                onRowClick={onRowClick}
               />
             </div>
           )}

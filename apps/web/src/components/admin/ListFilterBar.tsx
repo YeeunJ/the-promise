@@ -1,7 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { getBuildingColor } from '../../lib/adminConstants';
+import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import type { Space } from '../../types';
 import type { PaginatedReservationsFilters } from '../../hooks/usePaginatedReservations';
+
+const SEARCH_DEBOUNCE_MS = 250;
 
 type DatePreset = '1w' | '2w' | '1m' | 'custom';
 type OpenDropdown = 'space' | 'date' | null;
@@ -11,6 +14,7 @@ interface ListFilterBarProps {
   onFiltersChange: (next: PaginatedReservationsFilters) => void;
   spaces: Space[];
   isLoading?: boolean;
+  orientation?: 'horizontal' | 'vertical';
 }
 
 const DATE_PRESET_LABELS: Record<DatePreset, string> = {
@@ -43,10 +47,36 @@ export function ListFilterBar({
   onFiltersChange,
   spaces,
   isLoading = false,
+  orientation = 'horizontal',
 }: ListFilterBarProps): JSX.Element {
+  const isVertical = orientation === 'vertical';
   const [openDropdown, setOpenDropdown] = useState<OpenDropdown>(null);
   const [datePreset, setDatePreset] = useState<DatePreset>('1w');
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const [searchInput, setSearchInput] = useState<string>(filters.search ?? '');
+  const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
+  const lastDispatchedSearchRef = useRef<string | undefined>(filters.search);
+
+  // 외부 filters.search 와 내부 input 동기화 (탭/필터 전환 등 외부 리셋 대응)
+  useEffect(() => {
+    const external = filters.search ?? '';
+    if (external !== searchInput && external !== lastDispatchedSearchRef.current) {
+      setSearchInput(external);
+    }
+    // 의도적으로 filters.search 만 의존 — searchInput 자체 변경은 사용자 입력
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.search]);
+
+  // 디바운스된 입력이 변하면 onFiltersChange 호출 (trim 후 빈값은 undefined)
+  useEffect(() => {
+    const trimmed = debouncedSearch.trim();
+    const normalized = trimmed === '' ? undefined : trimmed;
+    if (normalized === (filters.search ?? undefined)) return;
+    lastDispatchedSearchRef.current = normalized;
+    onFiltersChange({ ...filters, search: normalized });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedSearch]);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -105,7 +135,7 @@ export function ListFilterBar({
   }
 
   function handleSearchChange(value: string): void {
-    onFiltersChange({ ...filters, search: value });
+    setSearchInput(value);
   }
 
   const btnClass =
@@ -117,14 +147,18 @@ export function ListFilterBar({
     ? `장소: ${selectedSpace.name}`
     : '장소';
 
+  const containerClass = isVertical
+    ? 'flex flex-col gap-3 relative'
+    : 'flex gap-2 relative items-center mb-3';
+
   return (
-    <div ref={containerRef} className="flex gap-2 relative items-center mb-3">
+    <div ref={containerRef} className={containerClass}>
       {/* Space filter (single select) */}
-      <div className="relative">
+      <div className={isVertical ? 'relative' : 'relative'}>
         <button
           type="button"
           aria-label="장소 필터"
-          className={btnClass}
+          className={isVertical ? `${btnClass} w-full text-left` : btnClass}
           onClick={() => toggleDropdown('space')}
           disabled={isLoading}
         >
@@ -188,7 +222,7 @@ export function ListFilterBar({
         <button
           type="button"
           aria-label="기간 필터"
-          className={btnClass}
+          className={isVertical ? `${btnClass} w-full text-left` : btnClass}
           onClick={() => toggleDropdown('date')}
           disabled={isLoading}
         >
@@ -240,15 +274,49 @@ export function ListFilterBar({
         )}
       </div>
 
+      {/* Pastor filter — 백엔드 API 미지원 (todo §10). UI 만 placeholder */}
+      <div className="relative">
+        <button
+          type="button"
+          aria-label="담당교역자 필터 (준비 중)"
+          title="담당교역자 필터는 백엔드 보완 후 활성화됩니다 (백엔드 todo §10)"
+          className={
+            isVertical
+              ? `${btnClass} w-full text-left opacity-60 cursor-not-allowed`
+              : `${btnClass} opacity-60 cursor-not-allowed`
+          }
+          disabled
+        >
+          담당교역자 (준비 중) ▼
+        </button>
+      </div>
+
       {/* Search input */}
-      <input
-        type="search"
-        placeholder="신청자 이름 검색"
-        className="border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm bg-white min-w-[200px] disabled:opacity-50"
-        value={filters.search ?? ''}
-        onChange={(e) => handleSearchChange(e.target.value)}
-        disabled={isLoading}
-      />
+      <div
+        className={
+          isVertical ? 'relative w-full' : 'relative min-w-[200px]'
+        }
+      >
+        <input
+          type="search"
+          aria-label="이름·전화 검색"
+          placeholder="이름·전화 검색"
+          className={
+            isVertical
+              ? 'border border-[#E5E7EB] rounded-xl px-3 py-2 pr-9 text-sm bg-white w-full'
+              : 'border border-[#E5E7EB] rounded-xl px-3 py-2 pr-9 text-sm bg-white w-full'
+          }
+          value={searchInput}
+          onChange={(e) => handleSearchChange(e.target.value)}
+        />
+        {isLoading && (
+          <span
+            data-testid="search-spinner"
+            aria-hidden="true"
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 inline-block w-4 h-4 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin"
+          />
+        )}
+      </div>
     </div>
   );
 }

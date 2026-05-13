@@ -126,7 +126,7 @@ export function BuildingFormModal({
               }
               disabled={isSubmitting}
               required
-              className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/30 disabled:bg-gray-50"
+              className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:bg-gray-50"
             />
           </div>
 
@@ -145,7 +145,7 @@ export function BuildingFormModal({
               }
               disabled={isSubmitting}
               rows={3}
-              className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-primary/30 disabled:bg-gray-50"
+              className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:bg-gray-50"
             />
           </div>
         </div>
@@ -162,7 +162,7 @@ export function BuildingFormModal({
           <button
             type="submit"
             disabled={!isValid || isSubmitting}
-            className="bg-brand-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="bg-primary text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isSubmitting ? '저장 중...' : mode === 'create' ? '추가' : '저장'}
           </button>

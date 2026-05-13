@@ -41,11 +41,11 @@ describe('STATUS_LABEL', () => {
 
 describe('STATUS_CLASS', () => {
   it('confirmed 상태에 green 클래스를 포함한다', () => {
-    expect(STATUS_CLASS.confirmed).toContain('brand-primary');
+    expect(STATUS_CLASS.confirmed).toContain('primary');
   });
 
   it('pending 상태에 olive 클래스를 포함한다', () => {
-    expect(STATUS_CLASS.pending).toContain('brand-secondary');
+    expect(STATUS_CLASS.pending).toContain('primary-dark');
   });
 
   it('rejected 상태에 red 클래스를 포함한다', () => {

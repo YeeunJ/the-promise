@@ -64,7 +64,7 @@ export function CancelDialog({ isOpen, onConfirm, onClose, isLoading }: CancelDi
           value={adminNote}
           onChange={(e) => setAdminNote(e.target.value)}
           placeholder="취소 사유를 입력해주세요 (선택)"
-          className="w-full border border-[#E5E7EB] rounded-xl p-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-brand-primary/30"
+          className="w-full border border-[#E5E7EB] rounded-xl p-3 text-sm text-gray-700 resize-none focus:outline-none focus:ring-2 focus:ring-primary/30"
           rows={3}
         />
 

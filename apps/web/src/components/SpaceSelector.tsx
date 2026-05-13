@@ -47,6 +47,30 @@ function pickDefaultFloor(floors: (number | null)[]): number | null | undefined 
   return floor1 !== undefined ? floor1 : floors[0];
 }
 
+interface InitialSelection {
+  buildingId: number;
+  floor: number | null | undefined;
+}
+
+function pickInitialBuildingAndFloor(
+  buildings: BuildingWithSpaces[],
+  value: number | null,
+): InitialSelection | null {
+  if (value !== null) {
+    for (const building of buildings) {
+      const space = building.spaces.find((s) => s.id === value);
+      if (space) {
+        return { buildingId: building.id, floor: space.floor };
+      }
+    }
+  }
+  const defaultBuilding = pickDefaultBuilding(buildings);
+  if (!defaultBuilding) return null;
+  const floorMap = groupByFloor(defaultBuilding.spaces);
+  const floors = getSortedFloors(floorMap);
+  return { buildingId: defaultBuilding.id, floor: pickDefaultFloor(floors) };
+}
+
 export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorProps): JSX.Element {
   const [buildings, setBuildings] = useState<BuildingWithSpaces[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
@@ -61,12 +85,10 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
       .get<BuildingWithSpaces[]>(`${import.meta.env.VITE_API_BASE_URL}/api/v1/spaces/`)
       .then((res) => {
         setBuildings(res.data);
-        const defaultBuilding = pickDefaultBuilding(res.data);
-        if (defaultBuilding) {
-          setSelectedBuildingId(defaultBuilding.id);
-          const floorMap = groupByFloor(defaultBuilding.spaces);
-          const floors = getSortedFloors(floorMap);
-          setSelectedFloor(pickDefaultFloor(floors));
+        const initial = pickInitialBuildingAndFloor(res.data, value);
+        if (initial) {
+          setSelectedBuildingId(initial.buildingId);
+          setSelectedFloor(initial.floor);
         }
       })
       .catch(() => {
@@ -75,6 +97,7 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
       .finally(() => {
         setIsLoading(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId) ?? null;
@@ -107,7 +130,7 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
-        <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-primary border-t-transparent" />
+        <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <span className="ml-2 text-sm text-black">장소 목록 불러오는 중...</span>
       </div>
     );
@@ -132,7 +155,7 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
             onClick={() => handleBuildingSelect(building.id)}
             className={`flex-1 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
               selectedBuildingId === building.id
-                ? 'bg-brand-accent text-white'
+                ? 'bg-accent text-white'
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
@@ -153,7 +176,7 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
                 onClick={() => handleFloorSelect(floor)}
                 className={`rounded-lg px-3 py-2 text-sm font-medium text-left whitespace-nowrap transition-colors ${
                   selectedFloor === floor
-                    ? 'bg-brand-primary text-white'
+                    ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                 }`}
               >
@@ -177,8 +200,8 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
                     onClick={() => handleSpaceSelect(space)}
                     className={`rounded-xl border p-3 text-left transition-colors ${
                       value === space.id
-                        ? 'border-brand-primary bg-brand-primary/10 text-brand-primary'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-brand-primary/30 hover:bg-brand-primary/5'
+                        ? 'border-primary bg-primary/10 text-primary'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5'
                     }`}
                   >
                     <span className="block font-medium">{space.name}</span>

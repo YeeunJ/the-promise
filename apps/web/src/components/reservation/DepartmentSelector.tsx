@@ -108,7 +108,7 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
               onClick={() => handleDeptClick(dept)}
               className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                 selectedDept?.id === dept.id
-                  ? 'bg-brand-primary text-white'
+                  ? 'bg-primary text-white'
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
             >
@@ -123,7 +123,7 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
         <div>
           <p className="text-sm font-medium text-black mb-2">부서/단체명 직접 입력</p>
           <textarea
-            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary"
+            className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
             placeholder="부서/단체명을 직접 입력해 주세요"
             rows={2}
             value={directInput}
@@ -150,7 +150,7 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
                   onClick={() => handleTeamClick(team)}
                   className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
                     value?.teamId === team.id
-                      ? 'bg-brand-primary text-white'
+                      ? 'bg-primary text-white'
                       : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                   }`}
                 >
@@ -170,7 +170,7 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
       >
         {showPastor && (
           <p className="text-sm text-gray-600 mt-1">
-            <span className="text-brand-accent font-medium">담당 교역자</span>{' '}
+            <span className="text-accent font-medium">담당 교역자</span>{' '}
             <span className="font-semibold text-black">{value?.pastorDisplay}</span>
           </p>
         )}

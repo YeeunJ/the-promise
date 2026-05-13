@@ -4,10 +4,18 @@ import { getBuildingColor } from '../../lib/adminConstants';
 import { isCancellable } from '../../lib/reservationUtils';
 import { StatusBadge } from '../ui/StatusBadge';
 
+type DateOrdering = 'start_datetime' | '-start_datetime';
+
 interface ListTableProps {
   reservations: Reservation[];
   onCancelRequest: (id: number) => void;
   onDetailRequest: (id: number) => void;
+  // 정렬은 서버(백엔드 ordering 파라미터)가 책임. 둘 다 함께 전달되면
+  // "날짜" 헤더가 토글 가능한 컨트롤로 바뀐다.
+  ordering?: DateOrdering;
+  onOrderingChange?: (next: DateOrdering) => void;
+  // 빈 결과 메시지에 컨텍스트로 노출할 현재 검색어
+  searchQuery?: string;
 }
 
 function formatShortDate(isoString: string): string {
@@ -17,14 +25,67 @@ function formatShortDate(isoString: string): string {
   return `${month}.${day}`;
 }
 
-const COLUMN_HEADERS = [
-  '날짜', '건물', '장소', '시간', '이름', '부서', '인원', '목적', '상태', '액션',
+const STATIC_HEADERS = [
+  '건물', '장소', '시간', '이름', '부서', '인원', '목적', '상태', '액션',
 ] as const;
 
-export function ListTable({ reservations, onCancelRequest, onDetailRequest }: ListTableProps): JSX.Element {
-  const sorted = [...reservations].sort(
-    (a, b) => a.start_datetime.localeCompare(b.start_datetime),
+interface DateHeaderProps {
+  ordering: DateOrdering | undefined;
+  onOrderingChange: ((next: DateOrdering) => void) | undefined;
+}
+
+function DateHeader({
+  ordering,
+  onOrderingChange,
+}: DateHeaderProps): JSX.Element {
+  const sortable = ordering !== undefined && onOrderingChange !== undefined;
+
+  if (!sortable) {
+    return (
+      <th className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left">
+        날짜
+      </th>
+    );
+  }
+
+  const isDesc = ordering === '-start_datetime';
+  const ariaSort = isDesc ? 'descending' : 'ascending';
+  const icon = isDesc ? '↓' : '↑';
+  const next: DateOrdering = isDesc ? 'start_datetime' : '-start_datetime';
+
+  return (
+    <th
+      aria-sort={ariaSort}
+      className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left"
+    >
+      <button
+        type="button"
+        onClick={() => onOrderingChange(next)}
+        className="inline-flex items-center gap-1 hover:text-primary transition-colors"
+      >
+        날짜
+        <span aria-hidden="true" className="text-primary text-[10px]">
+          {icon}
+        </span>
+      </button>
+    </th>
   );
+}
+
+export function ListTable({
+  reservations,
+  onCancelRequest,
+  onDetailRequest,
+  ordering,
+  onOrderingChange,
+  searchQuery,
+}: ListTableProps): JSX.Element {
+  const isEmpty = reservations.length === 0;
+  const trimmedQuery = searchQuery?.trim();
+  const emptyMessage =
+    trimmedQuery
+      ? `검색어 '${trimmedQuery}'에 해당하는 예약이 없습니다.`
+      : '조회된 예약이 없습니다.';
 
   return (
     <div className="bg-white rounded-xl shadow-md border border-[#E5E7EB]">
@@ -38,7 +99,11 @@ export function ListTable({ reservations, onCancelRequest, onDetailRequest }: Li
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gray-50 z-10">
             <tr>
-              {COLUMN_HEADERS.map((header) => (
+              <DateHeader
+                ordering={ordering}
+                onOrderingChange={onOrderingChange}
+              />
+              {STATIC_HEADERS.map((header) => (
                 <th
                   key={header}
                   className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left"
@@ -49,7 +114,7 @@ export function ListTable({ reservations, onCancelRequest, onDetailRequest }: Li
             </tr>
           </thead>
           <tbody>
-            {sorted.map((reservation, index) => {
+            {reservations.map((reservation, index) => {
               const buildingName = reservation.space.building.name;
               const buildingColor = getBuildingColor(buildingName);
               const cancellable = isCancellable(reservation.status);
@@ -101,7 +166,7 @@ export function ListTable({ reservations, onCancelRequest, onDetailRequest }: Li
                       <button
                         type="button"
                         onClick={() => onDetailRequest(reservation.id)}
-                        className="text-xs px-2 py-1 rounded border border-brand-primary/30 text-brand-primary hover:bg-brand-primary/5 cursor-pointer"
+                        className="text-xs px-2 py-1 rounded border border-primary/30 text-primary hover:bg-primary/5 cursor-pointer"
                       >
                         상세보기
                       </button>
@@ -125,6 +190,15 @@ export function ListTable({ reservations, onCancelRequest, onDetailRequest }: Li
           </tbody>
         </table>
       </div>
+
+      {isEmpty && (
+        <div
+          role="status"
+          className="px-4 py-8 text-center text-sm text-gray-500 border-t border-[#E5E7EB]"
+        >
+          {emptyMessage}
+        </div>
+      )}
     </div>
   );
 }
