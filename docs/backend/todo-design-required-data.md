@@ -12,8 +12,8 @@
 | 중 | `Space.photo_url` 필드 | Room Card 공간 사진 (P3 Step 2) | 미구현 |
 | 중 | 관리자 주간 KPI 집계 API | AdminKpiRow "이번 주 예약" (P5) | 미구현 |
 | 중 | 팀 응답에 담당 교역자 정보 노출 | 단체 카드 (P3 Step 1), Teams 관리 (P5) | 부분 구현 |
-| 낮음 | 공간 가동률 집계 | KPI "가동률" (P5) | 미구현 |
-| 낮음 | 인기 공간 집계 (`top_space`) | KPI "인기 공간" (P5) | 미구현 |
+| 낮음 | 공간 가동률 집계 | KPI "가동률" (P5) → Phase 2에서 카드 제거됨 | 보류 |
+| 낮음 | 인기 공간 집계 (`top_space`) | KPI "인기 공간" (P5) → Phase 2에서 카드 제거됨 | 보류 |
 | 낮음 | `Space.weekly_count` (주간 예약 횟수) | Room Card "이번 주 N회" (P3) | 미구현 |
 | 중 | 예약 응답에 `department_name` 노출 | DetailModal "부서/팀" (P4), 디자인안 의도 "청년부 · 1청년부(디모데)" | 미구현 |
 | 중 | `Team.leader_phone` 데이터 정합성 | DetailModal "담당교역자" — phone 필드인데 시드 데이터에 pastor name 들어가 있음 | 데이터 이슈 |
@@ -483,8 +483,7 @@ if search:
 ## 관련 문서
 
 - 디자인 명세: [`design_handoff_reservation_system/README.md`](../../design_handoff_reservation_system/README.md)
-- Phase 2 마스터 플랜: [`docs/frontend/phase2-design-overhaul-plan.md`](../frontend/phase2-design-overhaul-plan.md) §8
-- Phase 2 진행 상황: [`docs/frontend/phase2-progress.md`](../frontend/phase2-progress.md)
-- F5 어드민 재구성: [`docs/frontend/phase2-progress.md`](../frontend/phase2-progress.md) §10
+- Phase 2 구현 보고서: [`docs/frontend/phase2-frontend-report.md`](../frontend/phase2-frontend-report.md)
+- Phase 2 개선 계획: [`docs/frontend/phase2-improvements-plan.md`](../frontend/phase2-improvements-plan.md)
 
 > 이전에 별도로 유지되던 `todo-admin-reservation-filter.md` (§1~§4) 는 2026-05-13 본 문서 §11~§14 로 흡수 + 원본 파일 삭제. 검색/정렬/전화번호 정규화/trim 가드 4 항목 모두 본 문서에서 추적.
