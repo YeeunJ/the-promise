@@ -61,12 +61,12 @@ export function ConfirmationPage(): JSX.Element {
       end_datetime: timeSlot.endTime,
     };
     try {
-      await axios.post<Reservation>(
+      const res = await axios.post<Reservation>(
         `${import.meta.env.VITE_API_BASE_URL}/api/v1/reservations/`,
         formData,
       );
       clear();
-      navigate('/booking/success', { replace: true });
+      navigate('/booking/success', { replace: true, state: { reservationId: res.data.id } });
     } catch (err) {
       let message = '예약 신청 중 오류가 발생했습니다. 다시 시도해주세요.';
       if (isAxiosError(err) && err.response?.data) {
@@ -97,7 +97,7 @@ export function ConfirmationPage(): JSX.Element {
             아래 내용을<br />확인하고 신청해주세요
           </h1>
           <p className="mt-3.5 text-sm leading-relaxed text-ink-soft">
-            신청 후 담당자 검토를 거쳐 <b className="text-ink">약 2시간 내</b>로 확정 알림을 보내드립니다.
+            신청 후 담당자 검토에 따라  <b className="text-ink">예약이 취소</b>될 수 있습니다.
           </p>
         </div>
 

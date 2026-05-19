@@ -35,18 +35,16 @@ function makeReservation(
 }
 
 describe('AdminKpiRow', () => {
-  it('4 KPI 카드 (이번 주 예약/확정 대기/가동률/인기 공간) 모두 렌더', () => {
+  it('2 KPI 카드 (이번 주 예약/확정 대기) 렌더', () => {
     render(<AdminKpiRow reservations={[]} weekStart="2026-05-11" weekEnd="2026-05-17" />);
     expect(screen.getByText('이번 주 예약')).toBeInTheDocument();
     expect(screen.getByText('확정 대기')).toBeInTheDocument();
-    expect(screen.getByText('가동률')).toBeInTheDocument();
-    expect(screen.getByText('인기 공간')).toBeInTheDocument();
   });
 
-  it('백엔드 미구현 항목 (가동률·인기 공간) 은 — 표시', () => {
+  it('빈 예약 목록에서 이번 주 예약 = 0, 확정 대기 = 0', () => {
     render(<AdminKpiRow reservations={[]} weekStart="2026-05-11" weekEnd="2026-05-17" />);
-    expect(screen.getByTestId('admin-kpi-utilization')).toHaveTextContent('—');
-    expect(screen.getByTestId('admin-kpi-top-space')).toHaveTextContent('—');
+    expect(screen.getByTestId('admin-kpi-weekly')).toHaveTextContent('0');
+    expect(screen.getByTestId('admin-kpi-pending')).toHaveTextContent('0');
   });
 
   it('이번 주 범위 안 confirmed + pending 만 합산', () => {

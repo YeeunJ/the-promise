@@ -1,14 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { DayPicker } from 'react-day-picker';
-import 'react-day-picker/style.css';
+import type { WeekdayProps } from 'react-day-picker';
 import { Clock } from 'lucide-react';
+import { isKoreanHoliday } from '../../../utils/koreanHolidays';
 import type { TimeSlotValue } from '../../../types';
 import {
   generateTimeSlots,
   formatTime,
   formatTimeSlotLabel,
-  extractTimeHHMM,
-  DEFAULT_START_TIME,
   getKSTDateString,
 } from '../../../utils/formatDatetime';
 import { useOccupiedSlots } from '../../../hooks/useOccupiedSlots';
@@ -23,8 +22,6 @@ interface DateTimeStepProps {
   spaceId: number | null;
 }
 
-const DAY_END_TIME = '21:30';
-
 function computeDurationLabel(start: string, end: string): string {
   const ms = new Date(end).getTime() - new Date(start).getTime();
   if (ms <= 0) return '';
@@ -34,6 +31,16 @@ function computeDurationLabel(start: string, end: string): string {
   if (h === 0) return `${m}m`;
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
+}
+
+const KR_DAYS = ['일', '월', '화', '수', '목', '금', '토'] as const;
+
+function KoreanWeekday(props: WeekdayProps) {
+  const name = props.children as string;
+  const colorClass = name === '일' ? 'text-red-500' : name === '토' ? 'text-blue-500' : '';
+  return (
+    <th {...props} className={`flex-1 text-center text-xs font-medium py-1 ${colorClass}`} />
+  );
 }
 
 export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): JSX.Element {
@@ -135,6 +142,12 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
     'disabled-bridge': 'bg-surface-2 text-ink-mute border-edge-soft cursor-not-allowed opacity-60',
   };
 
+  function handleTimeReset(): void {
+    const next = { ...localValue, startTime: '', endTime: '' };
+    setLocalValue(next);
+    onChangeRef.current(next);
+  }
+
   function handleSlotClick(slot: string): void {
     if (isSlotDisabled(slot) && slot !== localValue.startTime && slot !== localValue.endTime) return;
     let next: TimeSlotValue;
@@ -157,17 +170,35 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
     const d = String(date.getDate()).padStart(2, '0');
-    setLocalValue({ date: `${y}-${m}-${d}`, startTime: '', endTime: '' });
+    const dateStr = `${y}-${m}-${d}`;
+    const next: TimeSlotValue = { date: dateStr, startTime: '', endTime: '' };
+    setLocalValue(next);
+    onChangeRef.current(next);
   }
 
-  const visibleSlots = useMemo(
-    () =>
-      slots.filter((s) => {
-        const t = extractTimeHHMM(s);
-        return t >= DEFAULT_START_TIME && t <= DAY_END_TIME;
-      }),
-    [slots],
-  );
+  const visibleSlots = slots;
+
+  const dayPickerClassNames = {
+    root: 'w-full',
+    months: 'flex flex-col',
+    month: 'w-full',
+    month_caption: 'flex justify-between items-center px-2 py-3',
+    caption_label: 'text-sm font-semibold text-ink',
+    nav: 'flex gap-1',
+    button_previous: 'w-7 h-7 flex items-center justify-center rounded-lg hover:bg-primary-50 text-ink-mute',
+    button_next: 'w-7 h-7 flex items-center justify-center rounded-lg hover:bg-primary-50 text-ink-mute',
+    month_grid: 'w-full border-collapse',
+    weekdays: 'flex w-full',
+    weekday: 'flex-1 text-center text-xs font-medium text-ink-mute py-1',
+    week: 'flex w-full mt-1',
+    day: 'flex-1 text-center',
+    day_button: 'w-8 h-8 mx-auto flex items-center justify-center rounded-full text-sm text-ink hover:bg-primary-50 cursor-pointer transition-colors',
+    selected: '[&>button]:bg-primary [&>button]:!text-white [&>button]:hover:bg-primary-dark',
+    today: '[&>button]:font-extrabold [&>button]:!text-primary',
+    disabled: '[&>button]:opacity-30 [&>button]:cursor-not-allowed',
+    outside: '[&>button]:opacity-40',
+    hidden: 'invisible',
+  };
 
   const selectedDate = localValue.date ? new Date(localValue.date + 'T00:00:00') : undefined;
 
@@ -188,6 +219,22 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
           selected={selectedDate}
           onSelect={handleDaySelect}
           disabled={{ before: today }}
+          classNames={dayPickerClassNames}
+          formatters={{
+            formatCaption: (month) => `${month.getFullYear()}년 ${month.getMonth() + 1}월`,
+            formatWeekdayName: (day) => KR_DAYS[day.getDay()],
+          }}
+          components={{ Weekday: KoreanWeekday }}
+          modifiers={{
+            holiday: isKoreanHoliday,
+            sunday: (d) => d.getDay() === 0,
+            saturday: (d) => d.getDay() === 6,
+          }}
+          modifiersClassNames={{
+            sunday: '[&>button]:text-red-500',
+            saturday: '[&>button]:text-blue-500',
+            holiday: '[&>button]:!text-red-500 [&>button]:font-semibold',
+          }}
         />
       </section>
 
@@ -197,6 +244,15 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
           <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-accent">
             시간
           </div>
+          {(localValue.startTime || localValue.endTime) && (
+            <button
+              type="button"
+              onClick={handleTimeReset}
+              className="ml-auto text-xs font-medium text-ink-mute hover:text-danger transition-colors"
+            >
+              선택 초기화
+            </button>
+          )}
           {showRangePill && (
             <span
               data-testid="time-range-pill"
@@ -249,17 +305,17 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
                 );
               })}
             </div>
-            <div className="mt-3 flex items-center gap-4 text-[11px] text-ink-soft">
+            <div className="mt-3 flex items-center gap-4 text-base text-ink-soft">
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary" />
+                <span className="inline-block h-4 w-4 rounded-sm bg-primary" />
                 선택
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-primary-100" />
+                <span className="inline-block h-4 w-4 rounded-sm bg-primary-100" />
                 가능
               </div>
               <div className="flex items-center gap-1.5">
-                <span className="inline-block h-2.5 w-2.5 rounded-sm bg-edge" />
+                <span className="inline-block h-4 w-4 rounded-sm bg-edge" />
                 예약됨
               </div>
             </div>

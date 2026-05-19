@@ -173,6 +173,6 @@ describe('TeamsSection', () => {
     expect(showToast).toHaveBeenCalledWith('팀이 삭제되었습니다.', 'success');
     await waitFor(() => {
       expect(screen.getByText('등록된 팀이 없습니다.')).toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   });
 });

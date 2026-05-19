@@ -431,22 +431,25 @@ function ReservationTable({
   onRowClick,
 }: ReservationTableProps): JSX.Element {
   const [showPast, setShowPast] = useState(false);
+  const activeUpcoming = upcoming.filter(
+    (r) => r.status !== 'cancelled' && r.status !== 'rejected',
+  );
 
-  if (upcoming.length === 0 && past.length === 0) {
+  if (activeUpcoming.length === 0 && past.length === 0) {
     return <EmptyState onGoToApply={onGoToApply} />;
   }
 
   return (
     <>
-      {upcoming.length === 0 ? (
+      {activeUpcoming.length === 0 ? (
         <div className="text-center py-8 space-y-2">
           <p className="text-sm text-gray-500">예정된 예약이 없습니다.</p>
         </div>
       ) : (
         <>
-          <ResultHeader upcomingCount={upcoming.length} />
+          <ResultHeader upcomingCount={activeUpcoming.length} />
           <ReservationList
-            reservations={upcoming}
+            reservations={activeUpcoming}
             credentials={credentials}
             onCancelSuccess={onCancelSuccess}
             onRowClick={onRowClick}

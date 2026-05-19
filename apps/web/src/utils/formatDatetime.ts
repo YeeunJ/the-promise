@@ -2,7 +2,7 @@ const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'];
 
 /** 기본 시간 표시 범위 (HH:MM) */
-export const DEFAULT_START_TIME = '07:00';
+export const DEFAULT_START_TIME = '00:00';
 export const DEFAULT_END_TIME = '23:30';
 
 /**
@@ -94,7 +94,7 @@ export function formatDateStr(dateStr: string): string {
  * 예: "2026-04-10T13:00:00+09:00" → "2026-04-10"
  */
 export function extractDateStr(isoString: string): string {
-  return isoString.slice(0, 10);
+  return new Date(new Date(isoString).getTime() + KST_OFFSET_MS).toISOString().slice(0, 10);
 }
 
 /**

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { Clipboard, Search, User, Phone, Info } from 'lucide-react';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { normalizePhone } from '../utils/formatPhone';
 import { useLookupCredentials } from '../hooks/useLookupCredentials';
+import type { PaginatedResponse, Reservation } from '../types';
 
 function LookupLoginPage(): JSX.Element {
   const navigate = useNavigate();
@@ -12,8 +14,9 @@ function LookupLoginPage(): JSX.Element {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>): void {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>): Promise<void> {
     e.preventDefault();
     setError(null);
 
@@ -29,8 +32,26 @@ function LookupLoginPage(): JSX.Element {
       return;
     }
 
-    setCredentials({ name: trimmedName, phone: trimmedPhone });
-    navigate('/my');
+    setIsSubmitting(true);
+    try {
+      const baseUrl = import.meta.env.VITE_API_BASE_URL as string;
+      const params = { name: trimmedName, phone: trimmedPhone, page_size: 1 };
+      const [currentRes, pastRes] = await Promise.all([
+        axios.get<PaginatedResponse<Reservation>>(`${baseUrl}/api/v1/reservations/current/`, { params }),
+        axios.get<PaginatedResponse<Reservation>>(`${baseUrl}/api/v1/reservations/past/`, { params }),
+      ]);
+      const total = currentRes.data.count + pastRes.data.count;
+      if (total === 0) {
+        setError('입력하신 정보로 조회된 예약이 없습니다.');
+        return;
+      }
+      setCredentials({ name: trimmedName, phone: trimmedPhone });
+      navigate('/my');
+    } catch {
+      setError('조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -94,8 +115,9 @@ function LookupLoginPage(): JSX.Element {
               variant="primary"
               iconLeft={<Search size={16} />}
               className="w-full"
+              disabled={isSubmitting}
             >
-              예약 조회하기
+              {isSubmitting ? '조회 중...' : '예약 조회하기'}
             </Button>
           </div>
 

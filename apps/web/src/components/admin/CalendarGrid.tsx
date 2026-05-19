@@ -76,7 +76,13 @@ function Chips({ dayReservations, onReservationClick }: ChipsProps): JSX.Element
               onReservationClick?.(r);
             }}
           >
-            {r.applicant_team || '-'} - {r.space.name}
+            {(() => {
+              const team =
+                r.applicant_team && r.applicant_team !== '-'
+                  ? r.applicant_team
+                  : r.custom_team_name;
+              return team ? `${team} - ${r.space.name}` : r.space.name;
+            })()}
           </button>
         );
       })}

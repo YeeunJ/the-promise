@@ -77,6 +77,25 @@ describe('BookingPage', () => {
 
   it('다음 버튼 클릭 → 다음 step 으로 이동', async () => {
     const user = userEvent.setup();
+    localStorage.setItem(
+      BOOKING_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        draft: {
+          applicant: {
+            name: '홍길동',
+            phone: '010-1234-5678',
+            departmentName: '청년부',
+            teamId: 11,
+            customTeamName: null,
+          },
+          space: null,
+          headcount: 0,
+          timeSlot: { date: '', startTime: '', endTime: '' },
+          purpose: '',
+        },
+        maxReachedStep: 1,
+      }),
+    );
     renderWithRouter('/booking');
     await user.click(screen.getByRole('button', { name: /다음/ }));
     expect(screen.getByRole('heading', { name: '장소 선택' })).toBeInTheDocument();
@@ -84,6 +103,25 @@ describe('BookingPage', () => {
 
   it('이전 버튼은 step 1 에서는 숨김, step 2 부터 표시', async () => {
     const user = userEvent.setup();
+    localStorage.setItem(
+      BOOKING_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        draft: {
+          applicant: {
+            name: '홍길동',
+            phone: '010-1234-5678',
+            departmentName: '청년부',
+            teamId: 11,
+            customTeamName: null,
+          },
+          space: null,
+          headcount: 0,
+          timeSlot: { date: '', startTime: '', endTime: '' },
+          purpose: '',
+        },
+        maxReachedStep: 1,
+      }),
+    );
     renderWithRouter('/booking');
     expect(screen.queryByRole('button', { name: /이전/ })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: /다음/ }));
@@ -112,13 +150,14 @@ describe('BookingPage', () => {
     );
     renderWithRouter('/booking');
     await user.click(screen.getByRole('button', { name: '취소' }));
+    await user.click(screen.getByRole('button', { name: '예, 취소합니다' }));
     expect(screen.getByText('Landing')).toBeInTheDocument();
   });
 
   it('완료 버튼은 isComplete=false 면 disabled', () => {
     renderWithRouter('/booking?step=5');
-    const btn = screen.getByRole('button', { name: '완료' });
-    expect(btn).toBeDisabled();
+    const btns = screen.getAllByRole('button', { name: '완료' });
+    btns.forEach((btn) => expect(btn).toBeDisabled());
   });
 
   it('localStorage 의 draft 로 step 별 progress 복원 (SummarySidebar 에 표시)', () => {

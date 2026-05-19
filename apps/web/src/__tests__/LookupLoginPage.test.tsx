@@ -1,9 +1,13 @@
-import { describe, it, expect, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import LookupLoginPage from '../pages/LookupLoginPage';
 import { LOOKUP_CREDENTIALS_STORAGE_KEY } from '../hooks/useLookupCredentials';
+
+vi.mock('axios');
+import axios from 'axios';
+const mockedAxios = vi.mocked(axios, true);
 
 function renderPage(): void {
   render(
@@ -19,6 +23,8 @@ function renderPage(): void {
 describe('LookupLoginPage', () => {
   beforeEach(() => {
     sessionStorage.clear();
+    vi.clearAllMocks();
+    mockedAxios.get.mockResolvedValue({ data: { count: 1, results: [] } });
   });
 
   it('renders heading and helper note', () => {
@@ -51,7 +57,7 @@ describe('LookupLoginPage', () => {
     await userEvent.type(screen.getByLabelText(/이름/), '홍길동');
     await userEvent.type(screen.getByLabelText(/연락처/), '01012345678');
     await userEvent.click(screen.getByRole('button', { name: /예약 조회하기/ }));
-    expect(screen.getByTestId('my-target')).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId('my-target')).toBeInTheDocument());
     const stored = sessionStorage.getItem(LOOKUP_CREDENTIALS_STORAGE_KEY);
     expect(stored).not.toBeNull();
     const parsed = JSON.parse(stored ?? '{}') as { name: string; phone: string };

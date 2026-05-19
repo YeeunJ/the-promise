@@ -170,18 +170,15 @@ export function ListTable({
                       >
                         상세보기
                       </button>
-                      <button
-                        type="button"
-                        disabled={!cancellable}
-                        onClick={() => onCancelRequest(reservation.id)}
-                        className={`text-xs px-2 py-1 rounded border ${
-                          cancellable
-                            ? 'text-[#DC2626] border-[#DC2626]/30 hover:bg-[#DC2626]/5 cursor-pointer'
-                            : 'text-gray-400 border-gray-200 opacity-50 cursor-not-allowed'
-                        }`}
-                      >
-                        취소하기
-                      </button>
+                      {cancellable && (
+                        <button
+                          type="button"
+                          onClick={() => onCancelRequest(reservation.id)}
+                          className="text-xs px-2 py-1 rounded border text-[#DC2626] border-[#DC2626]/30 hover:bg-[#DC2626]/5 cursor-pointer"
+                        >
+                          취소하기
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

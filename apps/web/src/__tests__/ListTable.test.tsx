@@ -278,22 +278,20 @@ describe('ListTable', () => {
       expect(button).not.toBeDisabled();
     });
 
-    it('rejected 상태에서 취소하기 버튼이 비활성화된다', () => {
+    it('rejected 상태에서 취소하기 버튼이 표시되지 않는다', () => {
       const reservation = makeReservation({ status: 'rejected' });
 
       render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
-      const button = screen.getByRole('button', { name: '취소하기' });
-      expect(button).toBeDisabled();
+      expect(screen.queryByRole('button', { name: '취소하기' })).not.toBeInTheDocument();
     });
 
-    it('cancelled 상태에서 취소하기 버튼이 비활성화된다', () => {
+    it('cancelled 상태에서 취소하기 버튼이 표시되지 않는다', () => {
       const reservation = makeReservation({ status: 'cancelled' });
 
       render(<ListTable reservations={[reservation]} onCancelRequest={vi.fn()} onDetailRequest={vi.fn()} />);
 
-      const button = screen.getByRole('button', { name: '취소하기' });
-      expect(button).toBeDisabled();
+      expect(screen.queryByRole('button', { name: '취소하기' })).not.toBeInTheDocument();
     });
 
     it('클릭 시 onCancelRequest를 reservation.id와 함께 호출한다', async () => {

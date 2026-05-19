@@ -136,7 +136,7 @@ export function UserReservationDetailModal({
             <p className="mb-3 text-[13px] font-semibold text-ink">
               이 예약을 정말 취소하시겠습니까? <span className="text-ink-mute">취소 후에는 되돌릴 수 없습니다.</span>
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="flex justify-between gap-2">
               <button
                 type="button"
                 onClick={() => setIsConfirmingCancel(false)}
@@ -154,7 +154,7 @@ export function UserReservationDetailModal({
             </div>
           </div>
         ) : (
-          <div className="flex justify-end gap-2 bg-surface-2 px-7 py-4">
+          <div className="flex justify-between gap-2 bg-surface-2 px-7 py-4">
             {isCancellable(reservation.status) && (
               <button
                 type="button"

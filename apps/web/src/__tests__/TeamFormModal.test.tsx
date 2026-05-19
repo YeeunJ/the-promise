@@ -2,11 +2,16 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { TeamFormModal } from '../components/admin/teams/TeamFormModal';
-import type { AdminTeam, ApiDepartment } from '../types';
+import type { AdminTeam, ApiDepartment, ApiPastor } from '../types';
 
 const departments: ApiDepartment[] = [
   { id: 1, name: '1교구', display_order: 1, pastor: null, teams: [] },
   { id: 2, name: '2교구', display_order: 2, pastor: null, teams: [] },
+];
+
+const pastors: ApiPastor[] = [
+  { id: 10, name: '홍길동', title: '목사' },
+  { id: 11, name: '김철수', title: '전도사' },
 ];
 
 const editTeam: AdminTeam = {
@@ -25,6 +30,7 @@ function defaultProps() {
     mode: 'create' as const,
     entity: null,
     departments,
+    pastors,
     isSubmitting: false,
     errorMessage: null,
     onSubmit: vi.fn().mockResolvedValue(undefined),
@@ -57,6 +63,7 @@ describe('TeamFormModal', () => {
     expect(screen.getByLabelText(/팀명/)).toHaveValue('대림1');
     expect(screen.getByLabelText(/부서/)).toHaveValue('1');
     expect(screen.getByLabelText(/연락처/)).toHaveValue('010-1111-2222');
+    expect(screen.getByLabelText(/담당교역자/)).toHaveValue('');
   });
 
   it('필수 필드가 비어 있으면 제출 버튼이 비활성화된다', () => {
@@ -94,10 +101,30 @@ describe('TeamFormModal', () => {
     );
   });
 
+  it('담당교역자를 선택하면 payload 에 pastor id 가 포함된다', async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TeamFormModal {...defaultProps()} onSubmit={onSubmit} />);
+
+    await userEvent.type(screen.getByLabelText(/팀명/), '신규팀');
+    await userEvent.selectOptions(screen.getByLabelText(/부서/), '2');
+    await userEvent.selectOptions(screen.getByLabelText(/담당교역자/), '10');
+    await userEvent.type(screen.getByLabelText(/연락처/), '010-9999-8888');
+
+    await userEvent.click(screen.getByRole('button', { name: '추가' }));
+
+    expect(onSubmit).toHaveBeenCalledWith({
+      name: '신규팀',
+      department: 2,
+      pastor: 10,
+      leader_phone: '010-9999-8888',
+    });
+  });
+
   it('isSubmitting=true 면 입력과 버튼이 모두 비활성화된다', () => {
     render(<TeamFormModal {...defaultProps()} isSubmitting={true} />);
     expect(screen.getByLabelText(/팀명/)).toBeDisabled();
     expect(screen.getByLabelText(/부서/)).toBeDisabled();
+    expect(screen.getByLabelText(/담당교역자/)).toBeDisabled();
     expect(screen.getByLabelText(/연락처/)).toBeDisabled();
     expect(screen.getByRole('button', { name: '닫기' })).toBeDisabled();
     expect(screen.getByRole('button', { name: '저장 중...' })).toBeDisabled();

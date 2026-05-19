@@ -136,27 +136,29 @@ function DepartmentSelector({ value, onChange }: DepartmentSelectorProps): JSX.E
       {/* 소그룹/팀 선택 */}
       <div
         className={`transition-all duration-200 ease-out overflow-hidden ${
-          showTeams ? 'max-h-64 opacity-100' : 'max-h-0 opacity-0 invisible'
+          showTeams ? 'max-h-[400px] opacity-100' : 'max-h-0 opacity-0 invisible'
         }`}
       >
         {selectedDept && !isEtcSelected && (
           <div>
             <p className="text-sm font-medium text-black mb-2">소그룹 선택</p>
-            <div className="flex flex-wrap gap-2">
-              {selectedDept.teams.map((team) => (
-                <button
-                  key={team.id}
-                  type="button"
-                  onClick={() => handleTeamClick(team)}
-                  className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
-                    value?.teamId === team.id
-                      ? 'bg-primary text-white'
-                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                  }`}
-                >
-                  {team.name}
-                </button>
-              ))}
+            <div className="max-h-52 overflow-y-auto pr-1">
+              <div className="flex flex-wrap gap-2">
+                {selectedDept.teams.map((team) => (
+                  <button
+                    key={team.id}
+                    type="button"
+                    onClick={() => handleTeamClick(team)}
+                    className={`rounded-xl px-4 py-2 text-sm font-medium transition-colors ${
+                      value?.teamId === team.id
+                        ? 'bg-primary text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {team.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         )}

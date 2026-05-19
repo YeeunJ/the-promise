@@ -210,20 +210,18 @@ describe('ReservationTable — 취소 모달', () => {
     });
   });
 
-  it('cancelled 예약은 취소 버튼이 비활성화된다 (boundary case)', () => {
+  it('cancelled 예약은 upcoming 필터링으로 취소 버튼이 표시되지 않는다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'cancelled' })];
     render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
-    const cancelBtns = screen.getAllByRole('button', { name: '예약 취소' });
-    cancelBtns.forEach((btn) => expect(btn).toBeDisabled());
+    expect(screen.queryByRole('button', { name: '예약 취소' })).not.toBeInTheDocument();
   });
 
-  it('rejected 예약은 취소 버튼이 비활성화된다 (boundary case)', () => {
+  it('rejected 예약은 upcoming 필터링으로 취소 버튼이 표시되지 않는다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'rejected' })];
     render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
-    const cancelBtns = screen.getAllByRole('button', { name: '예약 취소' });
-    cancelBtns.forEach((btn) => expect(btn).toBeDisabled());
+    expect(screen.queryByRole('button', { name: '예약 취소' })).not.toBeInTheDocument();
   });
 });
 
@@ -437,20 +435,18 @@ describe('ReservationTable — TicketButton 상태 피드백', () => {
     });
   });
 
-  it('cancelled 예약은 티켓 다운로드 버튼이 비활성화된다 (boundary case)', () => {
+  it('cancelled 예약은 upcoming 필터링으로 티켓 다운로드 버튼이 표시되지 않는다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'cancelled' })];
     render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
-    const ticketBtns = screen.getAllByText('티켓 다운로드');
-    ticketBtns.forEach((btn) => expect(btn.closest('button')).toBeDisabled());
+    expect(screen.queryByText('티켓 다운로드')).not.toBeInTheDocument();
   });
 
-  it('rejected 예약은 티켓 다운로드 버튼이 비활성화된다 (boundary case)', () => {
+  it('rejected 예약은 upcoming 필터링으로 티켓 다운로드 버튼이 표시되지 않는다 (boundary case)', () => {
     const reservations = [makeReservation({ status: 'rejected' })];
     render(<ReservationTable {...defaultProps} upcoming={reservations} />);
 
-    const ticketBtns = screen.getAllByText('티켓 다운로드');
-    ticketBtns.forEach((btn) => expect(btn.closest('button')).toBeDisabled());
+    expect(screen.queryByText('티켓 다운로드')).not.toBeInTheDocument();
   });
 
   it('confirmed 예약은 티켓 다운로드 버튼이 활성화된다', () => {

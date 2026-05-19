@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { BookingLayout } from '../components/booking/BookingLayout';
 import { StepHeader } from '../components/booking/StepHeader';
@@ -25,6 +25,8 @@ export function BookingPage(): JSX.Element {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   const currentStep = clampStep(searchParams.get('step'));
+
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
   const {
     draft,
@@ -59,6 +61,10 @@ export function BookingPage(): JSX.Element {
   }, [currentStep]);
 
   function handleCancel(): void {
+    setShowCancelConfirm(true);
+  }
+
+  function handleConfirmCancel(): void {
     clear();
     navigate('/');
   }
@@ -94,7 +100,9 @@ export function BookingPage(): JSX.Element {
       bottomBar={
         <BottomBar
           onPrev={currentStep > 1 ? handlePrev : undefined}
-          onNext={currentStep < TOTAL_STEPS ? handleNext : undefined}
+          onNext={currentStep === TOTAL_STEPS ? handleComplete : handleNext}
+          nextDisabled={currentStep === TOTAL_STEPS ? !isComplete : !isStepValid(currentStep)}
+          nextLabel={currentStep === TOTAL_STEPS ? '완료' : undefined}
         />
       }
     >
@@ -116,6 +124,32 @@ export function BookingPage(): JSX.Element {
       )}
       {currentStep === 5 && (
         <PurposeStep value={draft.purpose} onChange={updatePurpose} />
+      )}
+      {showCancelConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
+            <h3 className="text-base font-semibold text-[#1C1C1E] mb-2">예약 신청 취소</h3>
+            <p className="text-sm text-[#6B7280] mb-6">
+              작성 중인 내용이 모두 사라집니다.<br />정말 취소하시겠습니까?
+            </p>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCancelConfirm(false)}
+                className="flex-1 py-2.5 rounded-xl border border-[#E5E7EB] text-sm font-medium text-[#6B7280] hover:bg-[#F9FAFB]"
+              >
+                계속 작성
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmCancel}
+                className="flex-1 py-2.5 rounded-xl bg-[#DC2626] text-sm font-medium text-white hover:bg-[#B91C1C]"
+              >
+                예, 취소합니다
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </BookingLayout>
   );

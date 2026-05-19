@@ -38,77 +38,60 @@ function makeReservation(
 }
 
 describe('AdminSideRail', () => {
-  it('오늘 카드 + 확정 대기 카드 헤더 표시', () => {
+  it('selectedDate 없으면 날짜 선택 안내 표시', () => {
     render(
       <AdminSideRail
         reservations={[]}
-        todayDateStr="2026-05-13"
+        selectedDate={null}
         onReservationClick={vi.fn()}
       />,
     );
-    expect(screen.getByText('오늘')).toBeInTheDocument();
-    expect(screen.getByText('확정 대기')).toBeInTheDocument();
+    expect(screen.getByText('날짜를 선택하세요.')).toBeInTheDocument();
   });
 
-  it('오늘 일정이 비어있으면 안내 메시지', () => {
+  it('selectedDate 있고 예약 없으면 빈 안내 표시', () => {
     render(
       <AdminSideRail
         reservations={[]}
-        todayDateStr="2026-05-13"
+        selectedDate="2026-05-13"
         onReservationClick={vi.fn()}
       />,
     );
-    expect(screen.getByText(/오늘 일정이 없습니다/)).toBeInTheDocument();
+    expect(screen.getByText('해당 날짜에 예약이 없습니다.')).toBeInTheDocument();
   });
 
-  it('오늘 일정 표시 (confirmed 만)', () => {
+  it('선택한 날짜의 예약만 표시 (모든 상태)', () => {
     const reservations = [
       makeReservation(1, 'confirmed', '2026-05-13T10:00:00+09:00', '2026-05-13T11:00:00+09:00', '사랑방'),
       makeReservation(2, 'cancelled', '2026-05-13T14:00:00+09:00', '2026-05-13T15:00:00+09:00', '믿음방'),
+      makeReservation(3, 'pending', '2026-05-14T10:00:00+09:00', '2026-05-14T11:00:00+09:00', '소망방'),
     ];
     render(
       <AdminSideRail
         reservations={reservations}
-        todayDateStr="2026-05-13"
+        selectedDate="2026-05-13"
         onReservationClick={vi.fn()}
       />,
     );
     expect(screen.getByText(/사랑방/)).toBeInTheDocument();
-    expect(screen.queryByText(/믿음방/)).not.toBeInTheDocument();
+    expect(screen.getByText(/믿음방/)).toBeInTheDocument();
+    expect(screen.queryByText(/소망방/)).not.toBeInTheDocument();
   });
 
-  it('확정 대기 카드: pending 만 표시', () => {
+  it('항목 클릭 → onReservationClick(reservation)', async () => {
     const reservations = [
-      makeReservation(1, 'pending', '2099-12-31T10:00:00+09:00', '2099-12-31T11:00:00+09:00', '사랑방'),
-      makeReservation(2, 'confirmed', '2099-12-30T10:00:00+09:00', '2099-12-30T11:00:00+09:00', '믿음방'),
-    ];
-    render(
-      <AdminSideRail
-        reservations={reservations}
-        todayDateStr="2026-05-13"
-        onReservationClick={vi.fn()}
-      />,
-    );
-    // pending 1건
-    const pendingSection = screen.getByTestId('admin-side-rail-pending');
-    expect(pendingSection.textContent).toContain('사랑방');
-    expect(pendingSection.textContent).not.toContain('믿음방');
-  });
-
-  it('확정 대기 클릭 → onReservationClick(reservation)', async () => {
-    const reservations = [
-      makeReservation(99, 'pending', '2099-12-31T10:00:00+09:00', '2099-12-31T11:00:00+09:00'),
+      makeReservation(99, 'confirmed', '2026-05-13T10:00:00+09:00', '2026-05-13T11:00:00+09:00'),
     ];
     const onClick = vi.fn();
     const user = userEvent.setup();
     render(
       <AdminSideRail
         reservations={reservations}
-        todayDateStr="2026-05-13"
+        selectedDate="2026-05-13"
         onReservationClick={onClick}
       />,
     );
-    const item = screen.getByTestId('side-rail-pending-99');
+    const item = screen.getByTestId('side-rail-item-99');
     await user.click(item);
     expect(onClick).toHaveBeenCalledWith(expect.objectContaining({ id: 99 }));
   });

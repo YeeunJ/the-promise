@@ -102,7 +102,7 @@ export function ReservationDetailModal({
             <FieldRow label="이름" value={reservation.applicant_name} />
             <FieldRow label="연락처" value={reservation.applicant_phone} />
             <FieldRow label="부서/팀" value={teamDisplay} />
-            <FieldRow label="담당자 연락처" value={reservation.leader_phone || '-'} />
+            <FieldRow label="담당교역자" value={reservation.leader_phone || '-'} />
           </div>
 
           {/* 예약 정보 섹션 */}

@@ -3,6 +3,7 @@ import type {
   AdminTeam,
   AdminTeamWritePayload,
   ApiDepartment,
+  ApiPastor,
 } from '../../../types';
 
 interface TeamFormModalProps {
@@ -10,6 +11,7 @@ interface TeamFormModalProps {
   mode: 'create' | 'edit';
   entity: AdminTeam | null;
   departments: ApiDepartment[];
+  pastors: ApiPastor[];
   isSubmitting: boolean;
   errorMessage: string | null;
   onSubmit: (payload: AdminTeamWritePayload) => Promise<void>;
@@ -18,18 +20,20 @@ interface TeamFormModalProps {
 
 interface FormState {
   name: string;
-  departmentId: string;       // select 의 value 는 string
+  departmentId: string;
+  pastorId: string;
   leaderPhone: string;
 }
 
 function initialFromEntity(entity: AdminTeam | null): FormState {
   if (entity === null) {
-    return { name: '', departmentId: '', leaderPhone: '' };
+    return { name: '', departmentId: '', pastorId: '', leaderPhone: '' };
   }
   return {
     name: entity.name,
     departmentId:
       entity.department === null ? '' : String(entity.department.id),
+    pastorId: entity.pastor === null ? '' : String(entity.pastor.id),
     leaderPhone: entity.leader_phone,
   };
 }
@@ -39,6 +43,7 @@ export function TeamFormModal({
   mode,
   entity,
   departments,
+  pastors,
   isSubmitting,
   errorMessage,
   onSubmit,
@@ -83,7 +88,7 @@ export function TeamFormModal({
     const payload: AdminTeamWritePayload = {
       name: trimmedName,
       department: Number(form.departmentId),
-      pastor: null,             // 1차 결정: pastor 는 항상 null
+      pastor: form.pastorId !== '' ? Number(form.pastorId) : null,
       leader_phone: trimmedPhone,
     };
     await onSubmit(payload);
@@ -170,6 +175,33 @@ export function TeamFormModal({
               ))}
             </select>
           </div>
+
+          {pastors.length > 0 && (
+            <div>
+              <label
+                htmlFor="team-pastor"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                담당교역자
+              </label>
+              <select
+                id="team-pastor"
+                value={form.pastorId}
+                onChange={(e) =>
+                  setForm((prev) => ({ ...prev, pastorId: e.target.value }))
+                }
+                disabled={isSubmitting}
+                className="w-full border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:bg-gray-50"
+              >
+                <option value="">없음</option>
+                {pastors.map((p) => (
+                  <option key={p.id} value={String(p.id)}>
+                    {p.name} {p.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label

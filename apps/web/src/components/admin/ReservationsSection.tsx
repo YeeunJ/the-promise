@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import type {
+  Building,
   PaginatedResponse,
   Reservation,
   ReservationStatus,
@@ -13,6 +14,7 @@ import {
   type PaginatedReservationsFilters,
 } from '../../hooks/usePaginatedReservations';
 import CalendarGrid from './CalendarGrid';
+import { SpaceFilterDropdown } from './SpaceFilterDropdown';
 import { ListFilterBar } from './ListFilterBar';
 import { ListTable } from './ListTable';
 import { CancelDialog } from './CancelDialog';
@@ -23,6 +25,8 @@ import { ReservationStatusChips } from './ReservationStatusChips';
 import { AdminKpiRow } from './AdminKpiRow';
 import { AdminSideRail } from './AdminSideRail';
 import { Pagination } from '../ui/Pagination';
+import { StatusPill } from '../ui/StatusPill';
+import { formatDate, formatTime } from '../../utils/formatDatetime';
 import type { ReactNode } from 'react';
 
 const LIST_PAGE_SIZE = 20;
@@ -74,6 +78,7 @@ export function ReservationsSection({
   const [cancelTargetId, setCancelTargetId] = useState<number | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const [detailTargetId, setDetailTargetId] = useState<number | null>(null);
+  const [kpiPopup, setKpiPopup] = useState<'weekly' | 'pending' | null>(null);
 
   // --- Calendar 모드 ---
   const [currentYear, setCurrentYear] = useState(() => new Date().getFullYear());
@@ -100,6 +105,24 @@ export function ReservationsSection({
     authToken,
     enabled: true,
   });
+
+  // 건물 목록 (순서 보존, 중복 제거)
+  const buildings = useMemo<Building[]>(() => {
+    const seen = new Map<number, Building>();
+    for (const space of spaceOptions) {
+      if (!seen.has(space.building.id)) seen.set(space.building.id, space.building);
+    }
+    return [...seen.values()];
+  }, [spaceOptions]);
+
+  // 건물 chip 선택 시 해당 건물 공간만 드롭다운에 표시
+  const spacesForDropdown = useMemo(
+    () =>
+      listFilters.building_id !== undefined
+        ? spaceOptions.filter((s) => s.building.id === listFilters.building_id)
+        : spaceOptions,
+    [spaceOptions, listFilters.building_id],
+  );
 
   // List 모드 페이징 hook
   const listEndpoint =
@@ -239,7 +262,20 @@ export function ReservationsSection({
   }
 
   function handleFiltersChange(next: PaginatedReservationsFilters): void {
-    setListFilters(next);
+    let updated = next;
+    // 건물이 특정 건물로 변경될 때, 기존 공간이 해당 건물 소속이 아니면 공간 필터 초기화
+    if (next.building_id !== undefined && next.building_id !== listFilters.building_id) {
+      const currentSpace = spaceOptions.find((s) => s.id === listFilters.space_id);
+      if (currentSpace && currentSpace.building.id !== next.building_id) {
+        updated = { ...next, space_id: undefined };
+      }
+    }
+    setListFilters(updated);
+    setListPage(1);
+  }
+
+  function handleSpaceChange(spaceId: number | undefined): void {
+    setListFilters({ ...listFilters, space_id: spaceId });
     setListPage(1);
   }
 
@@ -310,6 +346,18 @@ export function ReservationsSection({
   const weekStart = weekStartDate.toISOString().slice(0, 10);
   const weekEnd = weekEndDate.toISOString().slice(0, 10);
 
+  const weeklyReservations = calendarReservations.filter(
+    (r) =>
+      (r.status === 'confirmed' || r.status === 'pending') &&
+      r.start_datetime.slice(0, 10) >= weekStart &&
+      r.start_datetime.slice(0, 10) <= weekEnd,
+  );
+  const pendingReservations = calendarReservations.filter(
+    (r) => r.status === 'pending',
+  );
+  const kpiPopupItems = kpiPopup === 'weekly' ? weeklyReservations : pendingReservations;
+  const kpiPopupTitle = kpiPopup === 'weekly' ? '이번 주 예약' : '확정 대기';
+
   const viewToggle = (
     <SegmentedControl
       value={viewMode}
@@ -351,6 +399,8 @@ export function ReservationsSection({
             reservations={calendarReservations}
             weekStart={weekStart}
             weekEnd={weekEnd}
+            onWeeklyClick={() => setKpiPopup('weekly')}
+            onPendingClick={() => setKpiPopup('pending')}
           />
           <div className="mt-6" />
         </>
@@ -372,7 +422,7 @@ export function ReservationsSection({
                 currentYear={currentYear}
                 currentMonth={currentMonth}
                 reservations={calendarReservations.filter(
-                  (r) => r.status === 'confirmed',
+                  (r) => r.status === 'confirmed' || r.status === 'pending',
                 )}
                 selectedDate={selectedDate}
                 onDateSelect={setSelectedDate}
@@ -391,7 +441,7 @@ export function ReservationsSection({
           <div className="hidden lg:block">
             <AdminSideRail
               reservations={calendarReservations}
-              todayDateStr={todayStr}
+              selectedDate={selectedDate}
               onReservationClick={(r) => setDetailTargetId(r.id)}
             />
           </div>
@@ -424,7 +474,7 @@ export function ReservationsSection({
               <ListFilterBar
                 filters={listFilters}
                 onFiltersChange={handleFiltersChange}
-                spaces={spaceOptions}
+                buildings={buildings}
                 isLoading={isListLoading}
                 orientation="vertical"
               />
@@ -432,6 +482,17 @@ export function ReservationsSection({
           </aside>
 
           <div className="min-w-0">
+            {/* 공간 드롭다운 필터 */}
+            {spacesForDropdown.length > 0 && (
+              <div className="mb-3">
+                <SpaceFilterDropdown
+                  spaces={spacesForDropdown}
+                  value={listFilters.space_id}
+                  onChange={handleSpaceChange}
+                />
+              </div>
+            )}
+
             {isListLoading ? (
               <div className="space-y-3">
                 <div className="animate-pulse bg-gray-200 rounded h-12" />
@@ -476,6 +537,64 @@ export function ReservationsSection({
         onClose={() => setDetailTargetId(null)}
         onCancelRequest={handleCancelRequest}
       />
+
+      {kpiPopup !== null && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+          onClick={() => setKpiPopup(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 max-h-[80vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between px-5 py-4 border-b border-[#E5E7EB]">
+              <h3 className="text-sm font-semibold text-[#1C1C1E]">
+                {kpiPopupTitle}
+                <span className="ml-2 text-xs font-normal text-gray-500">
+                  {kpiPopupItems.length}건
+                </span>
+              </h3>
+              <button
+                type="button"
+                onClick={() => setKpiPopup(null)}
+                className="text-gray-400 hover:text-gray-600 text-lg leading-none"
+                aria-label="닫기"
+              >
+                ✕
+              </button>
+            </div>
+            <ul className="overflow-y-auto flex-1 divide-y divide-[#F3F4F6]">
+              {kpiPopupItems.length === 0 && (
+                <li className="px-5 py-8 text-sm text-center text-gray-400">
+                  해당 예약이 없습니다.
+                </li>
+              )}
+              {kpiPopupItems.map((r) => (
+                <li key={r.id}>
+                  <button
+                    type="button"
+                    className="w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors"
+                    onClick={() => {
+                      setDetailTargetId(r.id);
+                      setKpiPopup(null);
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-medium text-gray-700 truncate">
+                        {r.applicant_team} · {r.space.building.name} {r.space.name}
+                      </span>
+                      <StatusPill status={r.status} size="sm" />
+                    </div>
+                    <div className="text-xs text-gray-400 mt-0.5">
+                      {formatDate(r.start_datetime)} {formatTime(r.start_datetime)} – {formatTime(r.end_datetime)}
+                    </div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      )}
 
     </>
   );

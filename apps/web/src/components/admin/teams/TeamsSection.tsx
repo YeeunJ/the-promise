@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { AdminTeam, AdminTeamWritePayload } from '../../../types';
+import type { AdminTeam, AdminTeamWritePayload, ApiPastor } from '../../../types';
 import { useAdminTeams } from '../../../hooks/useAdminTeams';
 import { useDepartments } from '../../../hooks/useDepartments';
 import { createTeam, updateTeam, deleteTeam } from '../../../lib/adminApi/teams';
@@ -37,6 +37,18 @@ export function TeamsSection({
 
   const [deleteTarget, setDeleteTarget] = useState<AdminTeam | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const pastors = useMemo((): ApiPastor[] => {
+    const seen = new Set<number>();
+    const result: ApiPastor[] = [];
+    for (const dept of departments) {
+      if (dept.pastor !== null && !seen.has(dept.pastor.id)) {
+        seen.add(dept.pastor.id);
+        result.push(dept.pastor);
+      }
+    }
+    return result;
+  }, [departments]);
 
   // 부서 chip 필터
   const [activeDeptId, setActiveDeptId] = useState<number | null>(null);
@@ -185,6 +197,7 @@ export function TeamsSection({
         mode={formMode}
         entity={formTarget}
         departments={departments}
+        pastors={pastors}
         isSubmitting={isSubmitting}
         errorMessage={formError}
         onSubmit={handleFormSubmit}

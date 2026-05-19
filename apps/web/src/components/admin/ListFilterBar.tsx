@@ -1,18 +1,18 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { getBuildingColor } from '../../lib/adminConstants';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
-import type { Space } from '../../types';
+import type { Building } from '../../types';
 import type { PaginatedReservationsFilters } from '../../hooks/usePaginatedReservations';
 
 const SEARCH_DEBOUNCE_MS = 250;
 
 type DatePreset = '1w' | '2w' | '1m' | 'custom';
-type OpenDropdown = 'space' | 'date' | null;
+type OpenDropdown = 'building' | 'date' | null;
 
 interface ListFilterBarProps {
   filters: PaginatedReservationsFilters;
   onFiltersChange: (next: PaginatedReservationsFilters) => void;
-  spaces: Space[];
+  buildings: Building[];
   isLoading?: boolean;
   orientation?: 'horizontal' | 'vertical';
 }
@@ -45,7 +45,7 @@ function computePresetRange(preset: Exclude<DatePreset, 'custom'>): {
 export function ListFilterBar({
   filters,
   onFiltersChange,
-  spaces,
+  buildings,
   isLoading = false,
   orientation = 'horizontal',
 }: ListFilterBarProps): JSX.Element {
@@ -58,17 +58,14 @@ export function ListFilterBar({
   const debouncedSearch = useDebouncedValue(searchInput, SEARCH_DEBOUNCE_MS);
   const lastDispatchedSearchRef = useRef<string | undefined>(filters.search);
 
-  // 외부 filters.search 와 내부 input 동기화 (탭/필터 전환 등 외부 리셋 대응)
   useEffect(() => {
     const external = filters.search ?? '';
     if (external !== searchInput && external !== lastDispatchedSearchRef.current) {
       setSearchInput(external);
     }
-    // 의도적으로 filters.search 만 의존 — searchInput 자체 변경은 사용자 입력
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.search]);
 
-  // 디바운스된 입력이 변하면 onFiltersChange 호출 (trim 후 빈값은 undefined)
   useEffect(() => {
     const trimmed = debouncedSearch.trim();
     const normalized = trimmed === '' ? undefined : trimmed;
@@ -78,7 +75,6 @@ export function ListFilterBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
 
-  // Close dropdown on outside click
   useEffect(() => {
     function handleClick(e: MouseEvent): void {
       if (
@@ -92,29 +88,17 @@ export function ListFilterBar({
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Group spaces by building
-  const buildingGroups = useMemo(() => {
-    const groups = new Map<string, Space[]>();
-    for (const space of spaces) {
-      const name = space.building.name;
-      const list = groups.get(name) ?? [];
-      list.push(space);
-      groups.set(name, list);
-    }
-    return groups;
-  }, [spaces]);
-
-  const selectedSpace = useMemo(() => {
-    if (typeof filters.space_id !== 'number') return null;
-    return spaces.find((s) => s.id === filters.space_id) ?? null;
-  }, [filters.space_id, spaces]);
+  const selectedBuilding =
+    typeof filters.building_id === 'number'
+      ? (buildings.find((b) => b.id === filters.building_id) ?? null)
+      : null;
 
   function toggleDropdown(name: OpenDropdown): void {
     setOpenDropdown((prev) => (prev === name ? null : name));
   }
 
-  function handleSpaceSelect(spaceId: number | undefined): void {
-    onFiltersChange({ ...filters, space_id: spaceId });
+  function handleBuildingSelect(buildingId: number | undefined): void {
+    onFiltersChange({ ...filters, building_id: buildingId });
     setOpenDropdown(null);
   }
 
@@ -134,18 +118,12 @@ export function ListFilterBar({
     onFiltersChange({ ...filters, to_date: value });
   }
 
-  function handleSearchChange(value: string): void {
-    setSearchInput(value);
-  }
-
   const btnClass =
     'border border-[#E5E7EB] rounded-xl px-3 py-2 text-sm bg-white hover:bg-gray-50 transition-colors disabled:opacity-50';
   const dropdownClass =
-    'absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-[#E5E7EB] p-3 z-50 min-w-[220px]';
+    'absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-[#E5E7EB] p-3 z-50 min-w-[180px] max-h-[280px] overflow-y-auto';
 
-  const spaceButtonLabel = selectedSpace
-    ? `장소: ${selectedSpace.name}`
-    : '장소';
+  const buildingButtonLabel = selectedBuilding ? selectedBuilding.name : '건물';
 
   const containerClass = isVertical
     ? 'flex flex-col gap-3 relative'
@@ -153,66 +131,45 @@ export function ListFilterBar({
 
   return (
     <div ref={containerRef} className={containerClass}>
-      {/* Space filter (single select) */}
-      <div className={isVertical ? 'relative' : 'relative'}>
+      {/* Building filter */}
+      <div className="relative">
         <button
           type="button"
-          aria-label="장소 필터"
+          aria-label="건물 필터"
           className={isVertical ? `${btnClass} w-full text-left` : btnClass}
-          onClick={() => toggleDropdown('space')}
+          onClick={() => toggleDropdown('building')}
           disabled={isLoading}
         >
-          {spaceButtonLabel} ▼
+          {buildingButtonLabel} ▼
         </button>
-        {openDropdown === 'space' && (
-          <div className={dropdownClass} data-testid="space-dropdown">
+        {openDropdown === 'building' && (
+          <div className={dropdownClass} data-testid="building-dropdown">
             <button
               type="button"
               className={`block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 ${
-                filters.space_id === undefined
-                  ? 'font-medium text-blue-600'
-                  : ''
+                filters.building_id === undefined ? 'font-medium text-blue-600' : ''
               }`}
-              onClick={() => handleSpaceSelect(undefined)}
+              onClick={() => handleBuildingSelect(undefined)}
             >
-              전체 장소
+              전체 건물
             </button>
-            {[...buildingGroups.entries()].map(
-              ([buildingName, buildingSpaces]) => {
-                const color = getBuildingColor(buildingName);
-                return (
-                  <div key={buildingName} className="mt-2 first:mt-1">
-                    <div className="mb-1">
-                      <span
-                        className="text-xs font-medium px-1.5 py-0.5 rounded"
-                        style={{
-                          color: color.main,
-                          backgroundColor: color.bg,
-                          border: `1px solid ${color.border}`,
-                        }}
-                      >
-                        {buildingName}
-                      </span>
-                    </div>
-                    {buildingSpaces.map((space) => {
-                      const isSelected = filters.space_id === space.id;
-                      return (
-                        <button
-                          key={space.id}
-                          type="button"
-                          className={`block w-full text-left px-2 py-1 pl-4 text-sm rounded hover:bg-gray-100 ${
-                            isSelected ? 'font-medium text-blue-600' : ''
-                          }`}
-                          onClick={() => handleSpaceSelect(space.id)}
-                        >
-                          {space.name}
-                        </button>
-                      );
-                    })}
-                  </div>
-                );
-              },
-            )}
+            {buildings.map((building) => {
+              const color = getBuildingColor(building.name);
+              const isSelected = filters.building_id === building.id;
+              return (
+                <button
+                  key={building.id}
+                  type="button"
+                  className={`block w-full text-left px-2 py-1.5 text-sm rounded hover:bg-gray-100 mt-0.5 ${
+                    isSelected ? 'font-medium' : ''
+                  }`}
+                  style={isSelected ? { color: color.main } : undefined}
+                  onClick={() => handleBuildingSelect(building.id)}
+                >
+                  {building.name}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
@@ -245,9 +202,7 @@ export function ListFilterBar({
             {datePreset === 'custom' && (
               <div className="mt-2 pt-2 border-t border-[#E5E7EB] flex gap-2">
                 <label className="text-sm">
-                  <span className="block text-xs text-gray-500 mb-0.5">
-                    시작일
-                  </span>
+                  <span className="block text-xs text-gray-500 mb-0.5">시작일</span>
                   <input
                     type="date"
                     aria-label="시작일"
@@ -257,9 +212,7 @@ export function ListFilterBar({
                   />
                 </label>
                 <label className="text-sm">
-                  <span className="block text-xs text-gray-500 mb-0.5">
-                    종료일
-                  </span>
+                  <span className="block text-xs text-gray-500 mb-0.5">종료일</span>
                   <input
                     type="date"
                     aria-label="종료일"
@@ -274,12 +227,12 @@ export function ListFilterBar({
         )}
       </div>
 
-      {/* Pastor filter — 백엔드 API 미지원 (todo §10). UI 만 placeholder */}
+      {/* Pastor filter — 백엔드 미지원 placeholder */}
       <div className="relative">
         <button
           type="button"
           aria-label="담당교역자 필터 (준비 중)"
-          title="담당교역자 필터는 백엔드 보완 후 활성화됩니다 (백엔드 todo §10)"
+          title="담당교역자 필터는 백엔드 보완 후 활성화됩니다"
           className={
             isVertical
               ? `${btnClass} w-full text-left opacity-60 cursor-not-allowed`
@@ -292,22 +245,14 @@ export function ListFilterBar({
       </div>
 
       {/* Search input */}
-      <div
-        className={
-          isVertical ? 'relative w-full' : 'relative min-w-[200px]'
-        }
-      >
+      <div className={isVertical ? 'relative w-full' : 'relative min-w-[200px]'}>
         <input
           type="search"
           aria-label="이름·전화 검색"
           placeholder="이름·전화 검색"
-          className={
-            isVertical
-              ? 'border border-[#E5E7EB] rounded-xl px-3 py-2 pr-9 text-sm bg-white w-full'
-              : 'border border-[#E5E7EB] rounded-xl px-3 py-2 pr-9 text-sm bg-white w-full'
-          }
+          className="border border-[#E5E7EB] rounded-xl px-3 py-2 pr-9 text-sm bg-white w-full"
           value={searchInput}
-          onChange={(e) => handleSearchChange(e.target.value)}
+          onChange={(e) => setSearchInput(e.target.value)}
         />
         {isLoading && (
           <span

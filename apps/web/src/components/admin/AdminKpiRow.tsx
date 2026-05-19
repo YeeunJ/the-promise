@@ -1,11 +1,13 @@
 import type { ReactNode } from 'react';
-import { CalendarRange, Clock, Gauge, Sparkles } from 'lucide-react';
+import { CalendarRange, Clock } from 'lucide-react';
 import type { Reservation } from '../../types';
 
 interface AdminKpiRowProps {
   reservations: ReadonlyArray<Reservation>;
   weekStart: string;
   weekEnd: string;
+  onWeeklyClick?: () => void;
+  onPendingClick?: () => void;
 }
 
 interface KpiSpec {
@@ -13,6 +15,7 @@ interface KpiSpec {
   label: string;
   value: ReactNode;
   icon: ReactNode;
+  onClick?: () => void;
 }
 
 function isWithinWeek(dateISO: string, start: string, end: string): boolean {
@@ -24,6 +27,8 @@ export function AdminKpiRow({
   reservations,
   weekStart,
   weekEnd,
+  onWeeklyClick,
+  onPendingClick,
 }: AdminKpiRowProps): JSX.Element {
   const weeklyCount = reservations.filter(
     (r) =>
@@ -38,34 +43,28 @@ export function AdminKpiRow({
       label: '이번 주 예약',
       value: weeklyCount,
       icon: <CalendarRange size={18} />,
+      onClick: onWeeklyClick,
     },
     {
       testId: 'admin-kpi-pending',
       label: '확정 대기',
       value: pendingCount,
       icon: <Clock size={18} />,
-    },
-    {
-      testId: 'admin-kpi-utilization',
-      label: '가동률',
-      value: '—',
-      icon: <Gauge size={18} />,
-    },
-    {
-      testId: 'admin-kpi-top-space',
-      label: '인기 공간',
-      value: '—',
-      icon: <Sparkles size={18} />,
+      onClick: onPendingClick,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3">
       {specs.map((s) => (
         <article
           key={s.testId}
           data-testid={s.testId}
-          className="rounded-[14px] border border-edge-soft bg-surface p-5 shadow-design-md"
+          onClick={s.onClick}
+          className={
+            'rounded-[14px] border border-edge-soft bg-surface p-5 shadow-design-md transition-shadow' +
+            (s.onClick ? ' cursor-pointer hover:shadow-md' : '')
+          }
         >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 flex-col gap-1">
