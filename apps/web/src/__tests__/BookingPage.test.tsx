@@ -40,9 +40,9 @@ beforeEach(() => {
   });
 });
 
-function renderWithRouter(initial: string = '/booking'): void {
+function renderBookingPage(): void {
   render(
-    <MemoryRouter initialEntries={[initial]}>
+    <MemoryRouter initialEntries={['/booking']}>
       <Routes>
         <Route path="/booking" element={<BookingPage />} />
         <Route path="/" element={<div>Landing</div>} />
@@ -53,30 +53,30 @@ function renderWithRouter(initial: string = '/booking'): void {
 }
 
 describe('BookingPage', () => {
-  it('/booking 진입 시 step 1 (신청자 정보) 렌더', () => {
-    renderWithRouter('/booking');
+  it('/booking 진입 시 step 1 (신청자 정보) active 렌더', () => {
+    renderBookingPage();
     expect(screen.getByRole('heading', { name: '신청자 정보' })).toBeInTheDocument();
   });
 
-  it('?step=3 진입 시 step 3 (인원 선택) 렌더', () => {
-    renderWithRouter('/booking?step=3');
-    expect(screen.getByRole('heading', { name: '인원 선택' })).toBeInTheDocument();
+  it('초기 진입 시 step 2~5 는 잠금 행으로 렌더 (heading 없음)', () => {
+    renderBookingPage();
+    expect(screen.queryByRole('heading', { name: '장소 선택' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '사용 인원' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '날짜 및 시간' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: '사용 목적' })).not.toBeInTheDocument();
   });
 
-  it('잘못된 step (예: 0, 99) 은 1 로 클램프', () => {
-    renderWithRouter('/booking?step=99');
-    expect(screen.getByRole('heading', { name: '신청자 정보' })).toBeInTheDocument();
+  it('StickyHeader 의 완료 버튼은 isComplete=false 면 disabled', () => {
+    renderBookingPage();
+    expect(screen.getByRole('button', { name: '완료' })).toBeDisabled();
   });
 
-  it('chip 클릭으로 step 점프 (자유 점프)', async () => {
-    const user = userEvent.setup();
-    renderWithRouter('/booking');
-    await user.click(screen.getByRole('button', { name: /사용 목적 입력/ }));
-    expect(screen.getByRole('heading', { name: '사용 목적' })).toBeInTheDocument();
+  it('SummaryRail 의 신청 현황 표시', () => {
+    renderBookingPage();
+    expect(screen.getByText('신청 현황')).toBeInTheDocument();
   });
 
-  it('다음 버튼 클릭 → 다음 step 으로 이동', async () => {
-    const user = userEvent.setup();
+  it('유효한 applicant draft 로드 시 다음 단계 버튼 활성화', () => {
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
       JSON.stringify({
@@ -84,9 +84,12 @@ describe('BookingPage', () => {
           applicant: {
             name: '홍길동',
             phone: '010-1234-5678',
+            departmentId: 1,
             departmentName: '청년부',
             teamId: 11,
+            teamName: '1청년',
             customTeamName: null,
+            pastorDisplay: '',
           },
           space: null,
           headcount: 0,
@@ -96,44 +99,65 @@ describe('BookingPage', () => {
         maxReachedStep: 1,
       }),
     );
-    renderWithRouter('/booking');
-    await user.click(screen.getByRole('button', { name: /다음/ }));
+    renderBookingPage();
+    expect(screen.getByRole('button', { name: /다음 단계/ })).not.toBeDisabled();
+  });
+
+  it('다음 단계 버튼 클릭 → step 2 (장소 선택) 열림', async () => {
+    const user = userEvent.setup();
+    localStorage.setItem(
+      BOOKING_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        draft: {
+          applicant: {
+            name: '홍길동',
+            phone: '010-1234-5678',
+            departmentId: 1,
+            departmentName: '청년부',
+            teamId: 11,
+            teamName: '1청년',
+            customTeamName: null,
+            pastorDisplay: '',
+          },
+          space: null,
+          headcount: 0,
+          timeSlot: { date: '', startTime: '', endTime: '' },
+          purpose: '',
+        },
+        maxReachedStep: 1,
+      }),
+    );
+    renderBookingPage();
+    await user.click(screen.getByRole('button', { name: /다음 단계/ }));
     expect(screen.getByRole('heading', { name: '장소 선택' })).toBeInTheDocument();
   });
 
-  it('이전 버튼은 step 1 에서는 숨김, step 2 부터 표시', async () => {
-    const user = userEvent.setup();
+  it('maxReachedStep=3 이면 step 3 (사용 인원) active', () => {
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
       JSON.stringify({
         draft: {
-          applicant: {
-            name: '홍길동',
-            phone: '010-1234-5678',
-            departmentName: '청년부',
-            teamId: 11,
-            customTeamName: null,
-          },
+          applicant: null,
           space: null,
           headcount: 0,
           timeSlot: { date: '', startTime: '', endTime: '' },
           purpose: '',
         },
-        maxReachedStep: 1,
+        maxReachedStep: 3,
       }),
     );
-    renderWithRouter('/booking');
-    expect(screen.queryByRole('button', { name: /이전/ })).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: /다음/ }));
-    expect(screen.getByRole('button', { name: /이전/ })).toBeInTheDocument();
+    renderBookingPage();
+    expect(screen.getByRole('heading', { name: '사용 인원' })).toBeInTheDocument();
   });
 
-  it('마지막 step (5) 에서 다음 버튼 숨김', () => {
-    renderWithRouter('/booking?step=5');
-    expect(screen.queryByRole('button', { name: /다음/ })).not.toBeInTheDocument();
+  it('취소 버튼 클릭 → confirm dialog 표시', async () => {
+    const user = userEvent.setup();
+    renderBookingPage();
+    await user.click(screen.getByRole('button', { name: '취소' }));
+    expect(screen.getByText('예약 신청 취소')).toBeInTheDocument();
   });
 
-  it('취소 버튼 클릭 → "/" 로 navigate + draft 초기화', async () => {
+  it('confirm cancel → "/" 로 navigate + draft 초기화', async () => {
     const user = userEvent.setup();
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
@@ -148,19 +172,21 @@ describe('BookingPage', () => {
         maxReachedStep: 3,
       }),
     );
-    renderWithRouter('/booking');
+    renderBookingPage();
     await user.click(screen.getByRole('button', { name: '취소' }));
     await user.click(screen.getByRole('button', { name: '예, 취소합니다' }));
     expect(screen.getByText('Landing')).toBeInTheDocument();
   });
 
-  it('완료 버튼은 isComplete=false 면 disabled', () => {
-    renderWithRouter('/booking?step=5');
-    const btns = screen.getAllByRole('button', { name: '완료' });
-    btns.forEach((btn) => expect(btn).toBeDisabled());
+  it('취소 dialog 에서 "계속 작성" 클릭 → dialog 닫힘', async () => {
+    const user = userEvent.setup();
+    renderBookingPage();
+    await user.click(screen.getByRole('button', { name: '취소' }));
+    await user.click(screen.getByRole('button', { name: '계속 작성' }));
+    expect(screen.queryByText('예약 신청 취소')).not.toBeInTheDocument();
   });
 
-  it('localStorage 의 draft 로 step 별 progress 복원 (SummarySidebar 에 표시)', () => {
+  it('localStorage draft 인원 → SummaryRail 에 표시', () => {
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
       JSON.stringify({
@@ -174,9 +200,8 @@ describe('BookingPage', () => {
         maxReachedStep: 3,
       }),
     );
-    renderWithRouter('/booking');
-    // 사이드바에 인원이 표시
-    expect(screen.getByText('인원')).toBeInTheDocument();
-    expect(screen.getByText('~30명')).toBeInTheDocument();
+    renderBookingPage();
+    expect(screen.getByText('신청 현황')).toBeInTheDocument();
+    expect(screen.getAllByText('~30명').length).toBeGreaterThan(0);
   });
 });

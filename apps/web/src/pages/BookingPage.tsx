@@ -1,149 +1,150 @@
-import { useCallback, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { BookingLayout } from '../components/booking/BookingLayout';
-import { StepHeader } from '../components/booking/StepHeader';
-import { SummarySidebar } from '../components/booking/SummarySidebar';
-import { BottomBar } from '../components/booking/BottomBar';
+import { useCallback, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { StickyHeader } from '../components/booking/StickyHeader';
+import { StepPanel } from '../components/booking/StepPanel';
+import { StepLockedRow } from '../components/booking/StepLockedRow';
+import { SummaryRail } from '../components/booking/SummaryRail';
 import { ApplicantStep } from '../components/booking/steps/ApplicantStep';
 import { SpaceStep } from '../components/booking/steps/SpaceStep';
 import { HeadcountStep } from '../components/booking/steps/HeadcountStep';
 import { DateTimeStep } from '../components/booking/steps/DateTimeStep';
 import { PurposeStep } from '../components/booking/steps/PurposeStep';
-import { useBookingDraft } from '../hooks/useBookingDraft';
-import { buildCompletedSteps } from '../utils/buildCompletedSteps';
+import { useStepFlow } from '../hooks/useStepFlow';
 
-const TOTAL_STEPS = 5;
-
-function clampStep(raw: string | null): number {
-  if (raw === null) return 1;
-  const n = Number(raw);
-  if (!Number.isFinite(n) || n < 1 || n > TOTAL_STEPS) return 1;
-  return Math.floor(n);
-}
+const STEPS = [
+  { title: '신청자 정보' },
+  { title: '장소 선택' },
+  { title: '사용 인원' },
+  { title: '날짜 및 시간' },
+  { title: '사용 목적' },
+];
 
 export function BookingPage(): JSX.Element {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
-  const currentStep = clampStep(searchParams.get('step'));
-
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  const {
-    draft,
-    maxReachedStep,
-    updateApplicant,
-    updateSpace,
-    updateHeadcount,
-    updateTimeSlot,
-    updatePurpose,
-    setMaxReachedStep,
-    clear,
-    isComplete,
-    isStepValid,
-  } = useBookingDraft();
-
-  function goToStep(step: number): void {
-    if (step < 1 || step > TOTAL_STEPS) return;
-    setSearchParams({ step: String(step) }, { replace: false });
-  }
-
-  const handleNext = useCallback((): void => {
-    if (currentStep >= TOTAL_STEPS) return;
-    const nextStep = currentStep + 1;
-    setMaxReachedStep(nextStep);
-    goToStep(nextStep);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep, setMaxReachedStep]);
-
-  const handlePrev = useCallback((): void => {
-    if (currentStep > 1) goToStep(currentStep - 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentStep]);
+  const flow = useStepFlow();
+  const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   function handleCancel(): void {
     setShowCancelConfirm(true);
   }
 
   function handleConfirmCancel(): void {
-    clear();
+    flow.clear();
     navigate('/');
   }
 
-  function handleComplete(): void {
-    if (!isComplete) return;
+  const handleComplete = useCallback((): void => {
+    if (!flow.isComplete) return;
     navigate('/booking/confirm');
-  }
+  }, [flow.isComplete, navigate]);
 
-  const validSteps: boolean[] = [1, 2, 3, 4, 5].map((s) => isStepValid(s));
-  const completedSteps = buildCompletedSteps({
-    applicant: draft.applicant,
-    space: draft.space,
-    headcount: draft.headcount,
-    timeSlot: draft.timeSlot,
-    purpose: draft.purpose,
-  });
+  const handleAdvance = useCallback(
+    (stepIndex: number): void => {
+      if (stepIndex === 4) {
+        handleComplete();
+      } else {
+        flow.advance();
+        requestAnimationFrame(() => {
+          const el = stepRefs.current[stepIndex + 1];
+          if (el) {
+            const top = el.getBoundingClientRect().top + window.scrollY - 90;
+            window.scrollTo({ top, behavior: 'smooth' });
+          }
+        });
+      }
+    },
+    [flow, handleComplete],
+  );
 
   return (
-    <BookingLayout
-      header={
-        <StepHeader
-          currentStep={currentStep}
-          maxReachedStep={maxReachedStep}
-          validSteps={validSteps}
-          isComplete={isComplete}
-          onStepChange={goToStep}
-          onCancel={handleCancel}
-          onComplete={handleComplete}
-        />
-      }
-      sidebar={<SummarySidebar items={completedSteps} />}
-      bottomBar={
-        <BottomBar
-          onPrev={currentStep > 1 ? handlePrev : undefined}
-          onNext={currentStep === TOTAL_STEPS ? handleComplete : handleNext}
-          nextDisabled={currentStep === TOTAL_STEPS ? !isComplete : !isStepValid(currentStep)}
-          nextLabel={currentStep === TOTAL_STEPS ? '완료' : undefined}
-        />
-      }
-    >
-      {currentStep === 1 && (
-        <ApplicantStep value={draft.applicant} onChange={updateApplicant} />
-      )}
-      {currentStep === 2 && (
-        <SpaceStep value={draft.space} onChange={updateSpace} />
-      )}
-      {currentStep === 3 && (
-        <HeadcountStep value={draft.headcount} onChange={updateHeadcount} />
-      )}
-      {currentStep === 4 && (
-        <DateTimeStep
-          value={draft.timeSlot}
-          onChange={updateTimeSlot}
-          spaceId={draft.space?.id ?? null}
-        />
-      )}
-      {currentStep === 5 && (
-        <PurposeStep value={draft.purpose} onChange={updatePurpose} />
-      )}
+    <>
+      <StickyHeader
+        currentStep={flow.currentStep}
+        isComplete={flow.isComplete}
+        onCancel={handleCancel}
+        onComplete={handleComplete}
+      />
+
+      <main className="max-w-[1200px] mx-auto px-6 pb-20 pt-7">
+        <div className="grid grid-cols-[1fr_280px] gap-7 items-start">
+          {/* Step list */}
+          <div className="flex flex-col gap-4">
+            {STEPS.map((step, i) => {
+              const state = flow.getStepState(i);
+
+              if (state === 'locked') {
+                return (
+                  <div key={step.title} ref={(el) => { stepRefs.current[i] = el; }}>
+                    <StepLockedRow stepNumber={i + 1} title={step.title} />
+                  </div>
+                );
+              }
+
+              return (
+                <div key={step.title} ref={(el) => { stepRefs.current[i] = el; }}>
+                  <StepPanel
+                    stepNumber={i + 1}
+                    title={step.title}
+                    isActive={state === 'active'}
+                    isFilled={flow.isStepValid(i + 1)}
+                    canAdvance={flow.isStepValid(i + 1)}
+                    isLastStep={i === 4}
+                    onAdvance={() => handleAdvance(i)}
+                  >
+                    {i === 0 && (
+                      <ApplicantStep value={flow.draft.applicant} onChange={flow.updateApplicant} />
+                    )}
+                    {i === 1 && (
+                      <SpaceStep value={flow.draft.space} onChange={flow.updateSpace} />
+                    )}
+                    {i === 2 && (
+                      <HeadcountStep value={flow.draft.headcount} onChange={flow.updateHeadcount} />
+                    )}
+                    {i === 3 && (
+                      <DateTimeStep
+                        value={flow.draft.timeSlot}
+                        onChange={flow.updateTimeSlot}
+                        spaceId={flow.draft.space?.id ?? null}
+                      />
+                    )}
+                    {i === 4 && (
+                      <PurposeStep value={flow.draft.purpose} onChange={flow.updatePurpose} />
+                    )}
+                  </StepPanel>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Summary rail */}
+          <SummaryRail draft={flow.draft} isStepValid={flow.isStepValid} />
+        </div>
+      </main>
+
+      {/* Cancel confirm dialog */}
       {showCancelConfirm && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl">
-            <h3 className="text-base font-semibold text-[#1C1C1E] mb-2">예약 신청 취소</h3>
-            <p className="text-sm text-[#6B7280] mb-6">
-              작성 중인 내용이 모두 사라집니다.<br />정말 취소하시겠습니까?
+          <div className="bg-surface rounded-2xl p-6 w-full max-w-sm mx-4 shadow-design-md">
+            <h3 className="text-base font-semibold text-ink mb-2">예약 신청 취소</h3>
+            <p className="text-sm text-ink-soft mb-6">
+              작성 중인 내용이 모두 사라집니다.
+              <br />
+              정말 취소하시겠습니까?
             </p>
             <div className="flex gap-3">
               <button
                 type="button"
                 onClick={() => setShowCancelConfirm(false)}
-                className="flex-1 py-2.5 rounded-xl border border-[#E5E7EB] text-sm font-medium text-[#6B7280] hover:bg-[#F9FAFB]"
+                className="flex-1 py-2.5 rounded-xl border border-edge text-sm font-medium text-ink-soft hover:bg-surface-2 transition-colors"
               >
                 계속 작성
               </button>
               <button
                 type="button"
                 onClick={handleConfirmCancel}
-                className="flex-1 py-2.5 rounded-xl bg-[#DC2626] text-sm font-medium text-white hover:bg-[#B91C1C]"
+                className="flex-1 py-2.5 rounded-xl bg-danger text-sm font-medium text-surface hover:opacity-90 transition-opacity"
               >
                 예, 취소합니다
               </button>
@@ -151,7 +152,7 @@ export function BookingPage(): JSX.Element {
           </div>
         </div>
       )}
-    </BookingLayout>
+    </>
   );
 }
 
