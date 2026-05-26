@@ -19,7 +19,6 @@ import {
 interface DateTimeStepProps {
   value: TimeSlotValue;
   onChange: (value: TimeSlotValue) => void;
-  spaceId: number | null;
 }
 
 function computeDurationLabel(start: string, end: string): string {
@@ -43,9 +42,9 @@ function KoreanWeekday(props: WeekdayProps) {
   );
 }
 
-export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): JSX.Element {
+export function DateTimeStep({ value, onChange }: DateTimeStepProps): JSX.Element {
   const [localValue, setLocalValue] = useState<TimeSlotValue>(value);
-  const { occupiedSlots, isLoading, error } = useOccupiedSlots(spaceId, localValue.date);
+  const { occupiedSlots, isLoading, error } = useOccupiedSlots(null, localValue.date);
 
   const todayStr = useMemo(() => getKSTDateString(), []);
   const today = useMemo(() => {
@@ -85,15 +84,6 @@ export function DateTimeStep({ value, onChange, spaceId }: DateTimeStepProps): J
       setLocalValue({ ...current, startTime: '', endTime: '' });
     }
   }, [occupiedSlots]);
-
-  // Reset selection when space changes
-  const prevSpaceIdRef = useRef(spaceId);
-  useEffect(() => {
-    if (prevSpaceIdRef.current !== spaceId) {
-      prevSpaceIdRef.current = spaceId;
-      setLocalValue({ date: '', startTime: '', endTime: '' });
-    }
-  }, [spaceId]);
 
   const slots = useMemo(
     () => (localValue.date ? generateTimeSlots(localValue.date) : []),

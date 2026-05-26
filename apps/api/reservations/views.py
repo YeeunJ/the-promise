@@ -806,7 +806,7 @@ class AdminTeamListCreateView(APIView):
 
     @extend_schema(responses=AdminTeamSerializer(many=True))
     def get(self, request):
-        teams = Team.objects.all().select_related("department", "pastor").order_by("department__name", "name")
+        teams = Team.objects.all().select_related("department", "department__pastor", "pastor").order_by("department__name", "name")
         return Response(AdminTeamSerializer(teams, many=True).data)
 
     @extend_schema(request=AdminTeamWriteSerializer, responses={201: AdminTeamSerializer})
@@ -814,7 +814,7 @@ class AdminTeamListCreateView(APIView):
         ser = AdminTeamWriteSerializer(data=request.data)
         if not ser.is_valid():
             return _admin_validation_error(ser.errors)
-        team = Team.objects.select_related("department", "pastor").get(pk=ser.save().pk)
+        team = Team.objects.select_related("department", "department__pastor", "pastor").get(pk=ser.save().pk)
         return Response(AdminTeamSerializer(team).data, status=status.HTTP_201_CREATED)
 
 
@@ -823,7 +823,7 @@ class AdminTeamDetailView(APIView):
 
     def _get_team(self, pk):
         try:
-            return Team.objects.select_related("department", "pastor").get(pk=pk)
+            return Team.objects.select_related("department", "department__pastor", "pastor").get(pk=pk)
         except Team.DoesNotExist:
             return None
 
@@ -836,7 +836,7 @@ class AdminTeamDetailView(APIView):
         if not ser.is_valid():
             return _admin_validation_error(ser.errors)
         ser.save()
-        team = Team.objects.select_related("department", "pastor").get(pk=team.pk)
+        team = Team.objects.select_related("department", "department__pastor", "pastor").get(pk=team.pk)
         return Response(AdminTeamSerializer(team).data)
 
     @extend_schema(responses={204: OpenApiResponse(description="소프트 삭제 완료")})

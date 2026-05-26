@@ -107,6 +107,7 @@ export function ListFilterBar({
     if (preset !== 'custom') {
       const { from, to } = computePresetRange(preset);
       onFiltersChange({ ...filters, from_date: from, to_date: to });
+      setOpenDropdown(null);
     }
   }
 
@@ -200,27 +201,36 @@ export function ListFilterBar({
               </button>
             ))}
             {datePreset === 'custom' && (
-              <div className="mt-2 pt-2 border-t border-[#E5E7EB] flex gap-2">
-                <label className="text-sm">
-                  <span className="block text-xs text-gray-500 mb-0.5">시작일</span>
-                  <input
-                    type="date"
-                    aria-label="시작일"
-                    className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
-                    value={filters.from_date ?? ''}
-                    onChange={(e) => handleCustomFromChange(e.target.value)}
-                  />
-                </label>
-                <label className="text-sm">
-                  <span className="block text-xs text-gray-500 mb-0.5">종료일</span>
-                  <input
-                    type="date"
-                    aria-label="종료일"
-                    className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
-                    value={filters.to_date ?? ''}
-                    onChange={(e) => handleCustomToChange(e.target.value)}
-                  />
-                </label>
+              <div className="mt-2 pt-2 border-t border-[#E5E7EB]">
+                <div className="flex gap-2">
+                  <label className="text-sm">
+                    <span className="block text-xs text-gray-500 mb-0.5">시작일</span>
+                    <input
+                      type="date"
+                      aria-label="시작일"
+                      className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
+                      value={filters.from_date ?? ''}
+                      onChange={(e) => handleCustomFromChange(e.target.value)}
+                    />
+                  </label>
+                  <label className="text-sm">
+                    <span className="block text-xs text-gray-500 mb-0.5">종료일</span>
+                    <input
+                      type="date"
+                      aria-label="종료일"
+                      className="border border-[#E5E7EB] rounded px-2 py-1 text-sm"
+                      value={filters.to_date ?? ''}
+                      onChange={(e) => handleCustomToChange(e.target.value)}
+                    />
+                  </label>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOpenDropdown(null)}
+                  className="mt-2 w-full rounded-lg bg-blue-600 px-3 py-1.5 text-sm text-white transition-colors hover:bg-blue-700"
+                >
+                  적용
+                </button>
               </div>
             )}
           </div>

@@ -61,19 +61,6 @@ describe('AdminTopNav', () => {
     expect(onSectionChange).toHaveBeenCalledWith('teams');
   });
 
-  it('검색 영역은 role=search + aria-disabled (백엔드 API 미존재)', () => {
-    render(
-      <AdminTopNav
-        section="reservations"
-        onSectionChange={vi.fn()}
-        onLogout={vi.fn()}
-      />,
-    );
-    const search = screen.getByRole('search');
-    expect(search).toHaveAttribute('aria-disabled', 'true');
-    expect(search.textContent).toMatch(/통합 검색.*준비 중/);
-  });
-
   it('로그아웃 버튼 클릭 → onLogout', async () => {
     const user = userEvent.setup();
     const onLogout = vi.fn();

@@ -47,7 +47,7 @@ describe('SpaceStep', () => {
     mockedAxios.get.mockResolvedValueOnce({ data: makeBuildings() });
     const { SpaceStep } = await import('../components/booking/steps/SpaceStep');
 
-    render(<SpaceStep value={null} onChange={vi.fn()} />);
+    render(<SpaceStep value={null} onChange={vi.fn()} timeSlot={null} />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: '본당' })).toBeInTheDocument();
@@ -62,7 +62,7 @@ describe('SpaceStep', () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
 
-    render(<SpaceStep value={null} onChange={onChange} />);
+    render(<SpaceStep value={null} onChange={onChange} timeSlot={null} />);
 
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /대예배실/ })).toBeInTheDocument();
@@ -89,7 +89,7 @@ describe('SpaceStep', () => {
       spaceName: '대예배실',
     };
 
-    render(<SpaceStep value={initial} onChange={vi.fn()} />);
+    render(<SpaceStep value={initial} onChange={vi.fn()} timeSlot={null} />);
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /대예배실/ })).toBeInTheDocument();
     });

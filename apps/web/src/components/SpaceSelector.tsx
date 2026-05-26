@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
-import type { BuildingWithSpaces, Space } from '../types';
+import type { BuildingWithSpaces, Space, SpaceAvailabilityItem } from '../types';
 
 interface SpaceSelectorProps {
   value: number | null;
   onChange: (spaceId: number) => void;
   onSpaceSelect?: (space: Space) => void;
+  availabilityMap?: Map<number, SpaceAvailabilityItem> | null;
 }
 
 function groupByFloor(spaces: Space[]): Map<number | null, Space[]> {
@@ -33,6 +34,7 @@ function getSortedFloors(floorMap: Map<number | null, Space[]>): (number | null)
 
 function floorLabel(floor: number | null): string {
   if (floor === null) return '기타';
+  if (floor === -1) return '지하1층';
   return `${floor}층`;
 }
 
@@ -71,7 +73,11 @@ function pickInitialBuildingAndFloor(
   return { buildingId: defaultBuilding.id, floor: pickDefaultFloor(floors) };
 }
 
-export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorProps): JSX.Element {
+function formatHHMM(isoStr: string): string {
+  return isoStr.slice(11, 16);
+}
+
+export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap }: SpaceSelectorProps): JSX.Element {
   const [buildings, setBuildings] = useState<BuildingWithSpaces[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null | undefined>(undefined);
@@ -193,23 +199,39 @@ export function SpaceSelector({ value, onChange, onSpaceSelect }: SpaceSelectorP
               <p className="text-sm text-gray-400 pt-2">이 층에 공간이 없습니다</p>
             ) : (
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                {currentFloorSpaces.map((space) => (
-                  <button
-                    key={space.id}
-                    type="button"
-                    onClick={() => handleSpaceSelect(space)}
-                    className={`rounded-xl border p-3 text-left transition-colors ${
-                      value === space.id
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5'
-                    }`}
-                  >
-                    <span className="block font-medium">{space.name}</span>
-                    {space.capacity !== null && (
-                      <span className="text-xs text-gray-500">수용인원: {space.capacity}명</span>
-                    )}
-                  </button>
-                ))}
+                {currentFloorSpaces.map((space) => {
+                  const avail = availabilityMap?.get(space.id);
+                  const isUnavailable = avail?.availability === 'none';
+                  const isPartial = avail?.availability === 'partial';
+                  return (
+                    <button
+                      key={space.id}
+                      type="button"
+                      disabled={isUnavailable}
+                      onClick={() => !isUnavailable && handleSpaceSelect(space)}
+                      className={`rounded-xl border p-3 text-left transition-colors ${
+                        isUnavailable
+                          ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
+                          : value === space.id
+                            ? 'border-primary bg-primary/10 text-primary'
+                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5'
+                      }`}
+                    >
+                      <span className="block font-medium">{space.name}</span>
+                      {isUnavailable && avail.overlapping_reservations.length > 0 && (
+                        <span className="block text-xs text-red-400 mt-0.5">
+                          예약됨 {avail.overlapping_reservations.map((r) => `${formatHHMM(r.start_datetime)}~${formatHHMM(r.end_datetime)}`).join(', ')}
+                        </span>
+                      )}
+                      {isPartial && (
+                        <span className="block text-xs text-amber-500 mt-0.5">일부 예약 있음</span>
+                      )}
+                      {space.capacity !== null && (
+                        <span className="text-xs text-gray-500">수용인원: {space.capacity}명</span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>

@@ -40,8 +40,9 @@ function SortableHeader({ label, sortKey, currentKey, currentDir, onSort }: Sort
 }
 
 function formatPastor(team: AdminTeam): string {
-  if (team.pastor === null) return '-';
-  return `${team.pastor.name} ${team.pastor.title}`;
+  const pastor = team.pastor ?? team.department?.pastor ?? null;
+  if (pastor === null) return '-';
+  return `${pastor.name} ${pastor.title}`;
 }
 
 function formatDepartment(team: AdminTeam): string {

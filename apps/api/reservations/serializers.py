@@ -172,9 +172,11 @@ class SpaceAvailabilityQuerySerializer(serializers.Serializer):
 # ── Admin CRUD Serializers ────────────────────────────────────────────────────
 
 class AdminDepartmentSerializer(serializers.ModelSerializer):
+    pastor = PastorSerializer(read_only=True)
+
     class Meta:
         model  = Department
-        fields = ["id", "name"]
+        fields = ["id", "name", "pastor"]
 
 
 class AdminTeamSerializer(serializers.ModelSerializer):
