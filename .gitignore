@@ -31,3 +31,10 @@ Thumbs.db
 
 # 기타
 docs.zip
+docs/agent-handoff/
+
+docs/260328_회의록.md
+docs/장소사용신청서.jpg
+
+apps/web/tsconfig.tsbuildinfo
+/CLAUDE.md
