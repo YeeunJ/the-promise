@@ -65,7 +65,5 @@ make seed
 | [03-project-structure.md](docs/03-project-structure.md) | 폴더/파일 구조 및 역할 설명 |
 | [04-coding-conventions.md](docs/04-coding-conventions.md) | Python/Django, React/TS, API 컨벤션 |
 | [05-git-conventions.md](docs/05-git-conventions.md) | 브랜치 전략, 커밋 메시지, PR 규칙 |
-| [06-backend-setup.md](docs/06-backend-setup.md) | 백엔드 개발 환경 세팅 및 실행 방법 |
-| [07-frontend-setup.md](docs/07-frontend-setup.md) | 프론트엔드 개발 환경 세팅 및 실행 방법 |
 
-처음 합류하는 팀원은 `01 → 02 → 03 → 04 → 05 → 06 → 07` 순서로 읽어주세요.
+처음 합류하는 팀원은 `01 → 02 → 03 → 04 → 05` 순서로 읽어주세요.

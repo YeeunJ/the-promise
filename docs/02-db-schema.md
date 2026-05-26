@@ -56,8 +56,6 @@ buildings (건물)
 | applicant_name | varchar(50) | O | — | 신청자 이름 |
 | applicant_phone | varchar(20) | O | — | 신청자 연락처 |
 | applicant_team | varchar(100) | O | — | 신청 팀 이름 (자유 텍스트) |
-| leader_phone | varchar(20) | O | — | 책임자 연락처 |
-| headcount | integer | O | — | 예상 참석 인원 |
 | purpose | text | O | — | 사용 목적 |
 | start_datetime | timestamptz | O | — | 예약 시작 시각 |
 | end_datetime | timestamptz | O | — | 예약 종료 시각 |

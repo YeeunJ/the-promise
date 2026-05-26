@@ -10,10 +10,8 @@ venv/
 .venv/
 *.egg-info/
 
-
 # Node
 node_modules/
-apps/web/package-lock.json
 
 # 빌드 결과물
 dist/
