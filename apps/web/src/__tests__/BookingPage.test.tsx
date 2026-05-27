@@ -103,7 +103,7 @@ describe('BookingPage', () => {
     expect(screen.getByRole('button', { name: /다음 단계/ })).not.toBeDisabled();
   });
 
-  it('다음 단계 버튼 클릭 → step 2 (장소 선택) 열림', async () => {
+  it('다음 단계 버튼 클릭 → step 2 (날짜 및 시간) 열림', async () => {
     const user = userEvent.setup();
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
@@ -129,10 +129,10 @@ describe('BookingPage', () => {
     );
     renderBookingPage();
     await user.click(screen.getByRole('button', { name: /다음 단계/ }));
-    expect(screen.getByRole('heading', { name: '장소 선택' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '날짜 및 시간' })).toBeInTheDocument();
   });
 
-  it('maxReachedStep=3 이면 step 3 (사용 인원) active', () => {
+  it('maxReachedStep=3 이면 step 3 (장소 선택) active', () => {
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
       JSON.stringify({
@@ -147,7 +147,7 @@ describe('BookingPage', () => {
       }),
     );
     renderBookingPage();
-    expect(screen.getByRole('heading', { name: '사용 인원' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: '장소 선택' })).toBeInTheDocument();
   });
 
   it('취소 버튼 클릭 → confirm dialog 표시', async () => {

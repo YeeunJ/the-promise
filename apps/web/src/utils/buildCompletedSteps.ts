@@ -33,6 +33,13 @@ export function buildCompletedSteps({
     });
   }
 
+  if (timeSlot.date && timeSlot.startTime && timeSlot.endTime) {
+    steps.push({
+      label: '일시',
+      value: `${formatDateStr(timeSlot.date)} ${formatTime(timeSlot.startTime)} ~ ${formatTime(timeSlot.endTime)}`,
+    });
+  }
+
   if (space) {
     const floorPart = space.floor !== null ? ` ${space.floor}층` : '';
     steps.push({
@@ -45,13 +52,6 @@ export function buildCompletedSteps({
     steps.push({
       label: '인원',
       value: HEADCOUNT_OPTIONS.find((o) => o.value === headcount)?.label ?? `${headcount}명`,
-    });
-  }
-
-  if (timeSlot.date && timeSlot.startTime && timeSlot.endTime) {
-    steps.push({
-      label: '일시',
-      value: `${formatDateStr(timeSlot.date)} ${formatTime(timeSlot.startTime)} ~ ${formatTime(timeSlot.endTime)}`,
     });
   }
 

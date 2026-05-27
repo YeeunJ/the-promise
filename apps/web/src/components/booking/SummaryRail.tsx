@@ -37,9 +37,9 @@ function buildItems(draft: BookingDraft, isStepValid: (step: number) => boolean)
 
   return [
     { label: '신청자', value: applicantValue, filled: isStepValid(1) },
-    { label: '장소', value: spaceValue, filled: isStepValid(2) },
-    { label: '인원', value: headcountValue, filled: isStepValid(3) },
-    { label: '일시', value: timeValue, filled: isStepValid(4) },
+    { label: '일시', value: timeValue, filled: isStepValid(2) },
+    { label: '장소', value: spaceValue, filled: isStepValid(3) },
+    { label: '인원', value: headcountValue, filled: isStepValid(4) },
     { label: '사용 목적', value: purposeValue, filled: isStepValid(5) },
   ];
 }
