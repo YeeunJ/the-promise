@@ -201,8 +201,8 @@ export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap 
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {currentFloorSpaces.map((space) => {
                   const avail = availabilityMap?.get(space.id);
-                  const isUnavailable = avail?.availability === 'none';
-                  const isPartial = avail?.availability === 'partial';
+                  const isUnavailable =
+                    avail?.availability === 'none' || avail?.availability === 'partial';
                   return (
                     <button
                       key={space.id}
@@ -222,9 +222,6 @@ export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap 
                         <span className="block text-xs text-red-400 mt-0.5">
                           예약됨 {avail.overlapping_reservations.map((r) => `${formatHHMM(r.start_datetime)}~${formatHHMM(r.end_datetime)}`).join(', ')}
                         </span>
-                      )}
-                      {isPartial && (
-                        <span className="block text-xs text-amber-500 mt-0.5">일부 예약 있음</span>
                       )}
                       {space.capacity !== null && (
                         <span className="text-xs text-gray-500">수용인원: {space.capacity}명</span>
