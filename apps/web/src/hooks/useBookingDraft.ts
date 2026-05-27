@@ -110,11 +110,11 @@ function evaluateStep(draft: BookingDraft, step: number): boolean {
     case 1:
       return validateApplicant(draft.applicant);
     case 2:
-      return draft.space !== null;
-    case 3:
-      return draft.headcount > 0;
-    case 4:
       return validateTimeSlot(draft.timeSlot);
+    case 3:
+      return draft.space !== null;
+    case 4:
+      return draft.headcount > 0;
     case 5:
       return draft.purpose.trim().length > 0;
     default:

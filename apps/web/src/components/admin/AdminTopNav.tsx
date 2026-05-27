@@ -1,4 +1,4 @@
-import { Building2, LogOut, Search } from 'lucide-react';
+import { Building2, LogOut } from 'lucide-react';
 import type { AdminSection } from './SectionTabs';
 
 interface AdminTopNavProps {
@@ -64,32 +64,6 @@ export function AdminTopNav({
         </nav>
 
         <div className="flex-1" />
-
-        {/* Search (disabled — backend pending).
-            비기능 표시이므로 textbox role 없는 div 로 처리. 통합 검색 API 도착 시 input 으로 교체. */}
-        <div
-          role="search"
-          aria-disabled="true"
-          className="relative flex w-[280px] max-w-[40vw] cursor-not-allowed items-center rounded-full border border-edge bg-surface-2 py-2 pl-9 pr-12"
-        >
-          <Search
-            size={14}
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-mute"
-            aria-hidden="true"
-          />
-          <span
-            data-testid="admin-search-placeholder"
-            className="select-none text-[13px] text-ink-mute"
-          >
-            공간·팀·신청자 통합 검색 (준비 중)
-          </span>
-          <kbd
-            className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md bg-surface px-1.5 py-0.5 text-[10px] font-bold text-ink-mute"
-            aria-hidden="true"
-          >
-            ⌘K
-          </kbd>
-        </div>
 
         {/* Logout */}
         <button

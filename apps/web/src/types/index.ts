@@ -97,6 +97,20 @@ export interface TimeSlotValue {
   endTime: string;
 }
 
+export interface OverlappingReservation {
+  start_datetime: string;
+  end_datetime: string;
+}
+
+export interface SpaceAvailabilityItem {
+  id: number;
+  name: string;
+  floor: number | null;
+  capacity: number | null;
+  availability: 'full' | 'partial' | 'none';
+  overlapping_reservations: OverlappingReservation[];
+}
+
 export interface AdminLoginRequest {
   username: string;
   password: string;
@@ -126,6 +140,7 @@ export interface AdminTeamPastor {
 export interface AdminTeamDepartment {
   id: number;
   name: string;
+  pastor: AdminTeamPastor | null;
 }
 
 export interface AdminTeam {

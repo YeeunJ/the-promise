@@ -14,7 +14,7 @@ function deriveActiveTab(pathname: string): ActiveTab {
 export function AppShell(): JSX.Element {
   const location = useLocation();
   const navigate = useNavigate();
-  const { credentials } = useLookupCredentials();
+  const { clearCredentials } = useLookupCredentials();
   const active = deriveActiveTab(location.pathname);
 
   function goToBooking(): void {
@@ -22,14 +22,20 @@ export function AppShell(): JSX.Element {
   }
 
   function goToLookup(): void {
-    navigate(credentials !== null ? '/my' : '/my/login');
+    clearCredentials();
+    navigate('/my/login');
   }
 
   return (
     <div className="min-h-screen flex flex-col bg-canvas">
       <header className="bg-surface border-b border-edge-soft">
         <div className="max-w-[1180px] mx-auto px-10 py-[18px] flex items-center gap-[18px]">
-          <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center gap-2.5 cursor-pointer"
+            role="link"
+            aria-label="홈으로 이동"
+            onClick={() => navigate('/')}
+          >
             <div
               className="w-7 h-7 rounded-[7px] bg-primary grid place-items-center text-white"
               aria-hidden="true"

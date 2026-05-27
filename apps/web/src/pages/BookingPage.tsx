@@ -13,9 +13,9 @@ import { useStepFlow } from '../hooks/useStepFlow';
 
 const STEPS = [
   { title: '신청자 정보' },
+  { title: '날짜 및 시간' },
   { title: '장소 선택' },
   { title: '사용 인원' },
-  { title: '날짜 및 시간' },
   { title: '사용 목적' },
 ];
 
@@ -97,17 +97,17 @@ export function BookingPage(): JSX.Element {
                       <ApplicantStep value={flow.draft.applicant} onChange={flow.updateApplicant} />
                     )}
                     {i === 1 && (
-                      <SpaceStep value={flow.draft.space} onChange={flow.updateSpace} />
+                      <DateTimeStep value={flow.draft.timeSlot} onChange={flow.updateTimeSlot} />
                     )}
                     {i === 2 && (
-                      <HeadcountStep value={flow.draft.headcount} onChange={flow.updateHeadcount} />
+                      <SpaceStep
+                        value={flow.draft.space}
+                        onChange={flow.updateSpace}
+                        timeSlot={flow.draft.timeSlot}
+                      />
                     )}
                     {i === 3 && (
-                      <DateTimeStep
-                        value={flow.draft.timeSlot}
-                        onChange={flow.updateTimeSlot}
-                        spaceId={flow.draft.space?.id ?? null}
-                      />
+                      <HeadcountStep value={flow.draft.headcount} onChange={flow.updateHeadcount} />
                     )}
                     {i === 4 && (
                       <PurposeStep value={flow.draft.purpose} onChange={flow.updatePurpose} />
