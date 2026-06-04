@@ -23,7 +23,7 @@ export function SpaceStep({ value, onChange, timeSlot }: SpaceStepProps): JSX.El
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const { availabilityMap } = useSpaceAvailability(timeSlot);
+  const { availabilityMap, isLoading } = useSpaceAvailability(timeSlot);
 
   function handleSpaceSelect(space: Space): void {
     onChangeRef.current(spaceToSelection(space));
@@ -41,6 +41,7 @@ export function SpaceStep({ value, onChange, timeSlot }: SpaceStepProps): JSX.El
         }}
         onSpaceSelect={handleSpaceSelect}
         availabilityMap={availabilityMap}
+        availabilityLoading={isLoading}
       />
     </section>
   );

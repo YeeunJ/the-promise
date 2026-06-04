@@ -15,9 +15,9 @@ interface LandingStep {
 
 const STEPS: readonly LandingStep[] = [
   { number: 1, title: '신청자 정보 입력', description: '이름·연락처·소속 부서' },
-  { number: 2, title: '장소 선택', description: '건물 → 층 → 공간 순' },
-  { number: 3, title: '인원 선택', description: '예상 사용 인원' },
-  { number: 4, title: '날짜·시간 선택', description: '30분 단위 시간대' },
+  { number: 2, title: '날짜·시간 선택', description: '30분 단위 시간대' },
+  { number: 3, title: '장소 선택', description: '건물 → 층 → 공간 순' },
+  { number: 4, title: '인원 선택', description: '예상 사용 인원' },
   { number: 5, title: '사용 목적 입력', description: '예배·모임·세미나 등' },
 ] as const;
 
