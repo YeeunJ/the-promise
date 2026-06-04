@@ -3,7 +3,7 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import axios, { isAxiosError } from 'axios';
 import { Calendar, Check, MapPin, Pencil, Ticket, User, Users } from 'lucide-react';
 import { useBookingDraft } from '../hooks/useBookingDraft';
-import { resolveEditTarget } from '../lib/resolveEditTarget';
+import { checkSpaceAvailable } from '../lib/checkSpaceAvailability';
 import { formatTime, formatTimeSlotLabel, formatDateStr } from '../utils/formatDatetime';
 import type {
   ApiError,
@@ -48,34 +48,54 @@ export function ConfirmationPage(): JSX.Element {
   async function handleSubmit(): Promise<void> {
     setIsSubmitting(true);
     setSubmitError(null);
-    const formData: ReservationFormData = {
-      space: space.id,
-      applicant_name: applicant.name,
-      applicant_phone: applicant.phone,
-      team: applicant.teamId,
-      custom_team_name: applicant.customTeamName ?? '',
-      leader_phone: applicant.pastorDisplay || '직접 문의',
-      headcount,
-      purpose: purpose.trim(),
-      start_datetime: timeSlot.startTime,
-      end_datetime: timeSlot.endTime,
-    };
     try {
+      // (C) 신청 직전 가용성 재확인 — 이미 점유된 경우 서버 요청 전에 실패 처리.
+      //     재확인 자체가 실패하면 최종 판정을 서버 검증에 위임하고 그대로 진행한다.
+      try {
+        const available = await checkSpaceAvailable(space.id, timeSlot);
+        if (!available) {
+          navigate('/booking/failed', { replace: true, state: { reason: 'conflict' } });
+          return;
+        }
+      } catch {
+        /* 재확인 불가 → 서버 검증에 위임 */
+      }
+
+      const formData: ReservationFormData = {
+        space: space.id,
+        applicant_name: applicant.name,
+        applicant_phone: applicant.phone,
+        team: applicant.teamId,
+        custom_team_name: applicant.customTeamName ?? '',
+        leader_phone: applicant.pastorDisplay || '직접 문의',
+        headcount,
+        purpose: purpose.trim(),
+        start_datetime: timeSlot.startTime,
+        end_datetime: timeSlot.endTime,
+      };
+
       const res = await axios.post<Reservation>(
         `${import.meta.env.VITE_API_BASE_URL}/api/v1/reservations/`,
         formData,
       );
+
+      // (A) 서버는 충돌 예약도 status=rejected 로 저장한 뒤 2xx 로 응답한다.
+      //     성공 응답이라도 거절된 경우 실패 화면으로 보낸다. (재시도 위해 draft 유지)
+      if (res.data.status === 'rejected') {
+        navigate('/booking/failed', { replace: true, state: { reason: 'conflict' } });
+        return;
+      }
+
       clear();
       navigate('/booking/success', { replace: true, state: { reservationId: res.data.id } });
     } catch (err) {
+      // 검증·네트워크 오류는 인라인으로 표시해 사용자가 내용을 수정할 수 있게 한다.
       let message = '예약 신청 중 오류가 발생했습니다. 다시 시도해주세요.';
       if (isAxiosError(err) && err.response?.data) {
         const data = err.response.data as ApiError;
         message = data.message ?? message;
       }
       setSubmitError(message);
-      const targetStep = resolveEditTarget(message);
-      navigate(`/booking?step=${targetStep}&edit=1`);
     } finally {
       setIsSubmitting(false);
     }
