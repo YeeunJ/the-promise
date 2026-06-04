@@ -14,8 +14,9 @@ jobs:
       - name: Install Railway CLI
         run: npm install -g @railway/cli
       - name: Deploy to Railway
+        # 레포 루트에서 실행해야 함. Railway 서비스 Root Directory=apps/api 설정 때문에
+        # apps/api 안에서 실행하면 스냅샷에 apps/api 디렉토리가 없어 빌드가 실패한다.
         run: railway up --service 40623eb4-5359-4338-a0f9-09e7a9c92601
-        working-directory: apps/api
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
