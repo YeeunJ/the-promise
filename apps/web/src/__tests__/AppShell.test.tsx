@@ -70,13 +70,16 @@ describe('AppShell', () => {
     expect(screen.getByTestId('login')).toBeInTheDocument();
   });
 
-  it('clicking 내 예약 조회 with creds navigates to /my', async () => {
+  it('clicking 내 예약 조회 always navigates to /my/login and clears prior creds (공용 PC 다중 사용자 대응)', async () => {
+    // 같은 컴퓨터에서 여러 명이 조회하므로, 저장된 creds 가 있어도 매번 재로그인을 강제하고
+    // 이전 사용자의 creds 를 제거한다. (의도된 설계 — '/my' 직행은 추가하지 않는다)
     sessionStorage.setItem(
       LOOKUP_CREDENTIALS_STORAGE_KEY,
       JSON.stringify({ name: '홍길동', phone: '010-1234-5678' }),
     );
     renderWith('/');
     await userEvent.click(screen.getByRole('button', { name: '내 예약 조회' }));
-    expect(screen.getByTestId('my')).toBeInTheDocument();
+    expect(screen.getByTestId('login')).toBeInTheDocument();
+    expect(sessionStorage.getItem(LOOKUP_CREDENTIALS_STORAGE_KEY)).toBeNull();
   });
 });
