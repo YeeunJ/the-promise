@@ -8,7 +8,7 @@ function makeTeam(overrides: Partial<AdminTeam> = {}): AdminTeam {
   return {
     id: 1,
     name: '대림1',
-    department: { id: 1, name: '1교구' },
+    department: { id: 1, name: '1교구', pastor: null },
     pastor: { id: 1, name: '이상윤', title: '목사' },
     leader_phone: '010-1234-5678',
     is_active: true,

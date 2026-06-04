@@ -17,7 +17,7 @@ const pastors: ApiPastor[] = [
 const editTeam: AdminTeam = {
   id: 10,
   name: '대림1',
-  department: { id: 1, name: '1교구' },
+  department: { id: 1, name: '1교구', pastor: null },
   pastor: null,
   leader_phone: '010-1111-2222',
   is_active: true,
