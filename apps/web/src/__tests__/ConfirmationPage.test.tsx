@@ -7,8 +7,15 @@ import { BOOKING_DRAFT_STORAGE_KEY } from '../hooks/useBookingDraft';
 import type { ApplicantData, SpaceSelection } from '../types/booking';
 
 vi.mock('axios');
-import axios from 'axios';
+import axios, { isAxiosError } from 'axios';
 const mockedAxios = vi.mocked(axios, true);
+const mockedIsAxiosError = vi.mocked(isAxiosError);
+
+vi.mock('../lib/checkSpaceAvailability', () => ({
+  checkSpaceAvailable: vi.fn(),
+}));
+import { checkSpaceAvailable } from '../lib/checkSpaceAvailability';
+const mockedCheck = vi.mocked(checkSpaceAvailable);
 
 const filledApplicant: ApplicantData = {
   name: '홍길동',
@@ -55,6 +62,7 @@ function renderWithRouter(): void {
         <Route path="/booking/confirm" element={<ConfirmationPage />} />
         <Route path="/booking" element={<div>BookingPage</div>} />
         <Route path="/booking/success" element={<div>SuccessPage</div>} />
+        <Route path="/booking/failed" element={<div>FailedPage</div>} />
         <Route path="/" element={<div>Landing</div>} />
       </Routes>
     </MemoryRouter>,
@@ -65,6 +73,8 @@ describe('ConfirmationPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorage.clear();
+    mockedCheck.mockResolvedValue(true);
+    mockedIsAxiosError.mockReturnValue(false);
   });
 
   it('draft 미완성 시 /booking 으로 리다이렉트', () => {
@@ -110,20 +120,50 @@ describe('ConfirmationPage', () => {
     expect(localStorage.getItem(BOOKING_DRAFT_STORAGE_KEY)).toBeNull();
   });
 
-  it('"신청하기" 실패 (시간 키워드) → /booking?step=4&edit=1 로 navigate', async () => {
+  it('"신청하기" 응답이 status=rejected → /booking/failed 이동 + draft 보존', async () => {
     seedDraft();
-    mockedAxios.post.mockRejectedValueOnce({
-      isAxiosError: true,
-      response: { data: { error: 'invalid', message: '이미 예약된 시간입니다' } },
+    mockedAxios.post.mockResolvedValueOnce({
+      data: { id: 101, status: 'rejected' },
     });
-    mockedAxios.isAxiosError = vi.fn().mockReturnValue(true) as never;
     const user = userEvent.setup();
     renderWithRouter();
     await user.click(screen.getByRole('button', { name: /신청하기/ }));
 
     await waitFor(() => {
-      expect(screen.getByText('BookingPage')).toBeInTheDocument();
+      expect(screen.getByText('FailedPage')).toBeInTheDocument();
     });
-    // 에러 메시지가 화면 어딘가에 보존되어야 한다 (다음 진입 시 확인용은 별도 처리 가능)
+    // 재시도를 위해 draft 는 유지되어야 한다
+    expect(localStorage.getItem(BOOKING_DRAFT_STORAGE_KEY)).not.toBeNull();
+  });
+
+  it('신청 직전 재확인에서 점유 확인 시 POST 없이 /booking/failed 이동', async () => {
+    seedDraft();
+    mockedCheck.mockResolvedValueOnce(false);
+    const user = userEvent.setup();
+    renderWithRouter();
+    await user.click(screen.getByRole('button', { name: /신청하기/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText('FailedPage')).toBeInTheDocument();
+    });
+    expect(mockedAxios.post).not.toHaveBeenCalled();
+  });
+
+  it('"신청하기" 검증 오류 → 페이지 이동 없이 인라인 에러 메시지 표시', async () => {
+    seedDraft();
+    mockedAxios.post.mockRejectedValueOnce({
+      isAxiosError: true,
+      response: { data: { error: 'invalid', message: '이미 예약된 시간입니다' } },
+    });
+    mockedIsAxiosError.mockReturnValue(true);
+    const user = userEvent.setup();
+    renderWithRouter();
+    await user.click(screen.getByRole('button', { name: /신청하기/ }));
+
+    await waitFor(() => {
+      expect(screen.getByText('이미 예약된 시간입니다')).toBeInTheDocument();
+    });
+    // 확인 페이지에 머물러 사용자가 수정할 수 있어야 한다
+    expect(screen.getByRole('button', { name: '수정하기' })).toBeInTheDocument();
   });
 });

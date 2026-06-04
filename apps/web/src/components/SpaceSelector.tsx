@@ -7,6 +7,8 @@ interface SpaceSelectorProps {
   onChange: (spaceId: number) => void;
   onSpaceSelect?: (space: Space) => void;
   availabilityMap?: Map<number, SpaceAvailabilityItem> | null;
+  /** 선택한 시간대의 예약 가용성을 아직 조회 중인지 여부. true 동안 공간 선택을 막는다. */
+  availabilityLoading?: boolean;
 }
 
 function groupByFloor(spaces: Space[]): Map<number | null, Space[]> {
@@ -77,7 +79,7 @@ function formatHHMM(isoStr: string): string {
   return isoStr.slice(11, 16);
 }
 
-export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap }: SpaceSelectorProps): JSX.Element {
+export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap, availabilityLoading = false }: SpaceSelectorProps): JSX.Element {
   const [buildings, setBuildings] = useState<BuildingWithSpaces[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null | undefined>(undefined);
@@ -198,23 +200,33 @@ export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap 
             ) : currentFloorSpaces.length === 0 ? (
               <p className="text-sm text-gray-400 pt-2">이 층에 공간이 없습니다</p>
             ) : (
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <>
+                {availabilityLoading && (
+                  <p className="mb-2 flex items-center gap-1.5 text-xs text-gray-400">
+                    <span className="h-3 w-3 animate-spin rounded-full border-2 border-gray-300 border-t-transparent" />
+                    예약 가능 여부 확인 중…
+                  </p>
+                )}
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {currentFloorSpaces.map((space) => {
                   const avail = availabilityMap?.get(space.id);
                   const isUnavailable =
                     avail?.availability === 'none' || avail?.availability === 'partial';
+                  const isSelectable = !isUnavailable && !availabilityLoading;
                   return (
                     <button
                       key={space.id}
                       type="button"
-                      disabled={isUnavailable}
-                      onClick={() => !isUnavailable && handleSpaceSelect(space)}
+                      disabled={!isSelectable}
+                      onClick={() => isSelectable && handleSpaceSelect(space)}
                       className={`rounded-xl border p-3 text-left transition-colors ${
                         isUnavailable
                           ? 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed'
-                          : value === space.id
-                            ? 'border-primary bg-primary/10 text-primary'
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5'
+                          : availabilityLoading
+                            ? 'border-gray-100 bg-gray-50 text-gray-300 cursor-wait'
+                            : value === space.id
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-gray-200 bg-white text-gray-700 hover:border-primary/30 hover:bg-primary/5'
                       }`}
                     >
                       <span className="block font-medium">{space.name}</span>
@@ -229,7 +241,8 @@ export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap 
                     </button>
                   );
                 })}
-              </div>
+                </div>
+              </>
             )}
           </div>
         </div>
