@@ -3,7 +3,7 @@ import io
 from math import ceil
 
 from django.contrib.auth import authenticate
-from django.db.models import Q
+from django.db.models import Prefetch, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, inline_serializer
@@ -51,7 +51,14 @@ class DepartmentListView(APIView):
             Department.objects
             .filter(is_active=True)
             .select_related("pastor")
-            .prefetch_related("teams__pastor")
+            .prefetch_related(
+                Prefetch(
+                    "teams",
+                    queryset=Team.objects.filter(is_active=True)
+                    .select_related("pastor")
+                    .order_by("name"),
+                )
+            )
         )
         return Response(DepartmentSerializer(departments, many=True).data)
 
