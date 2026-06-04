@@ -6,11 +6,11 @@ from django.utils import timezone
 from rest_framework.authtoken.models import Token
 from rest_framework.test import APIClient
 
-from .models import Building, Leader, Reservation, Space, Team
+from .models import Building, Department, Pastor, Reservation, Space, Team
 
 
 class BaseTestCase(TestCase):
-    """공통 픽스처 세팅"""
+    """공통 픽스처 세팅 (현재 스키마: Pastor / Department / Team)."""
 
     def setUp(self):
         self.client = APIClient()
@@ -31,7 +31,20 @@ class BaseTestCase(TestCase):
             is_active=False,
         )
 
-        self.leader = Leader.objects.create(name="홍길동 목사", phone="010-0000-0000")
+        self.pastor = Pastor.objects.create(
+            name="홍길동", title="목사", phone="010-0000-0000"
+        )
+        self.department = Department.objects.create(
+            name="청년부", display_order=1, pastor=self.pastor, is_active=True
+        )
+        self.team = Team.objects.create(
+            name="청년1팀",
+            department=self.department,
+            pastor=self.pastor,
+            leader_phone="010-1111-2222",
+            is_active=True,
+        )
+
         self.admin = User.objects.create_superuser(username="admin", password="admin1234")
         self.token = Token.objects.create(user=self.admin)
 
@@ -44,7 +57,7 @@ class BaseTestCase(TestCase):
             space=space or self.space,
             applicant_name="홍길동",
             applicant_phone="01012345678",
-            applicant_team="청년부",
+            custom_team_name="청년부",
             leader_phone="01098765432",
             headcount=10,
             purpose="팀 모임",
@@ -55,8 +68,11 @@ class BaseTestCase(TestCase):
         defaults.update(kwargs)
         return Reservation.objects.create(**defaults)
 
+    def _auth(self):
+        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
 
-# ─── 모델 ──────────────────────────────────────────────────────────────────────
+
+# ─── 모델: Reservation.has_conflict ───────────────────────────────────────────
 
 class HasConflictTest(BaseTestCase):
     def test_no_conflict_when_no_reservations(self):
@@ -96,48 +112,93 @@ class HasConflictTest(BaseTestCase):
         self.assertFalse(r.has_conflict())
 
 
-# ─── 공개 API ──────────────────────────────────────────────────────────────────
+# ─── 모델: Team.get_pastor_display ────────────────────────────────────────────
+
+class TeamPastorDisplayTest(BaseTestCase):
+    def test_uses_team_pastor_when_set(self):
+        # Arrange: team.pastor가 직접 지정됨
+        # Act / Assert
+        self.assertEqual(self.team.get_pastor_display(), "홍길동 목사")
+
+    def test_falls_back_to_department_pastor(self):
+        dept_pastor = Pastor.objects.create(name="이순신", title="전도사", phone="010-2222-3333")
+        dept = Department.objects.create(name="장년부", display_order=2, pastor=dept_pastor)
+        team = Team.objects.create(
+            name="장년1팀", department=dept, pastor=None, leader_phone="010-0000-0001"
+        )
+        self.assertEqual(team.get_pastor_display(), "이순신 전도사")
+
+    def test_returns_none_when_no_pastor(self):
+        dept = Department.objects.create(name="유아부", display_order=3, pastor=None)
+        team = Team.objects.create(
+            name="유아1팀", department=dept, pastor=None, leader_phone="010-0000-0002"
+        )
+        self.assertIsNone(team.get_pastor_display())
+
+
+# ─── 공개 API: GET /api/v1/teams/ ─────────────────────────────────────────────
 
 class TeamListViewTest(BaseTestCase):
-    """GET /api/v1/teams/"""
-
-    def _make_team(self, name="청년부", category="청년회", leader=None, is_active=True):
+    def _make_team(self, name, is_active=True):
         return Team.objects.create(
-            name=name, category=category,
-            leader=leader or self.leader, is_active=is_active,
+            name=name,
+            department=self.department,
+            pastor=self.pastor,
+            leader_phone="010-3333-4444",
+            is_active=is_active,
         )
 
-    def test_returns_active_teams_with_leader(self):
-        self._make_team("1청년부")
-        self._make_team("2청년부")
+    def test_returns_active_teams(self):
+        # setUp의 self.team(청년1팀) + 추가 1팀 = 2
+        self._make_team("청년2팀")
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.data), 2)
 
     def test_inactive_team_excluded(self):
-        self._make_team("활성팀")
         self._make_team("비활성팀", is_active=False)
         response = self.client.get("/api/v1/teams/")
         names = [t["name"] for t in response.data]
         self.assertNotIn("비활성팀", names)
 
-    def test_response_includes_category_and_leader(self):
-        self._make_team()
+    def test_response_includes_expected_fields(self):
         response = self.client.get("/api/v1/teams/")
         item = response.data[0]
-        self.assertIn("category", item)
-        self.assertIn("leader", item)
-        self.assertIn("name", item["leader"])
-        self.assertIn("phone", item["leader"])
+        self.assertIn("id", item)
+        self.assertIn("name", item)
+        self.assertIn("leader_phone", item)
 
-    def test_returns_empty_when_no_teams(self):
+    def test_returns_empty_when_no_active_teams(self):
+        Team.objects.update(is_active=False)
         response = self.client.get("/api/v1/teams/")
         self.assertEqual(response.data, [])
 
 
-class SpaceListViewTest(BaseTestCase):
-    """GET /api/v1/spaces/"""
+# ─── 공개 API: GET /api/v1/departments/ ───────────────────────────────────────
 
+class DepartmentListViewTest(BaseTestCase):
+    """비활성 팀 제외 검증은 test_department_inactive_team.py가 담당하므로
+    여기서는 부서/목사 메타와 활성 부서 필터만 검증한다."""
+
+    def test_returns_active_departments_with_pastor_and_teams(self):
+        response = self.client.get("/api/v1/departments/")
+        self.assertEqual(response.status_code, 200)
+        dept = next(d for d in response.data if d["name"] == "청년부")
+        self.assertEqual(dept["pastor"]["name"], "홍길동")
+        self.assertIn("teams", dept)
+        team = next(t for t in dept["teams"] if t["name"] == "청년1팀")
+        self.assertEqual(team["pastor_display"], "홍길동 목사")
+
+    def test_inactive_department_excluded(self):
+        Department.objects.create(name="비활성부서", display_order=99, is_active=False)
+        response = self.client.get("/api/v1/departments/")
+        names = [d["name"] for d in response.data]
+        self.assertNotIn("비활성부서", names)
+
+
+# ─── 공개 API: GET /api/v1/spaces/ ────────────────────────────────────────────
+
+class SpaceListViewTest(BaseTestCase):
     def test_returns_active_buildings_and_spaces(self):
         response = self.client.get("/api/v1/spaces/")
         self.assertEqual(response.status_code, 200)
@@ -157,15 +218,15 @@ class SpaceListViewTest(BaseTestCase):
         self.assertNotIn("비활성건물", names)
 
 
-class ReservationCreateTest(BaseTestCase):
-    """POST /api/v1/reservations/"""
+# ─── 공개 API: POST /api/v1/reservations/ ─────────────────────────────────────
 
+class ReservationCreateTest(BaseTestCase):
     def _payload(self, start_hour=10, end_hour=12, start_minute=0, end_minute=0):
         return {
             "space": self.space.pk,
             "applicant_name": "홍길동",
             "applicant_phone": "01012345678",
-            "applicant_team": "청년부",
+            "custom_team_name": "청년부",
             "leader_phone": "01098765432",
             "headcount": 10,
             "purpose": "팀 모임",
@@ -178,6 +239,20 @@ class ReservationCreateTest(BaseTestCase):
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["status"], "confirmed")
 
+    def test_create_with_team_fk(self):
+        payload = self._payload()
+        payload.pop("custom_team_name")
+        payload["team"] = self.team.pk
+        response = self.client.post("/api/v1/reservations/", payload, format="json")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["team"], self.team.pk)
+        # applicant_team(SerializerMethodField)은 team.name을 반환
+        self.assertEqual(response.data["applicant_team"], "청년1팀")
+
+    def test_applicant_team_falls_back_to_custom_name(self):
+        response = self.client.post("/api/v1/reservations/", self._payload(), format="json")
+        self.assertEqual(response.data["applicant_team"], "청년부")
+
     def test_rejected_when_conflict_exists(self):
         self._make_reservation(10, 12)
         response = self.client.post("/api/v1/reservations/", self._payload(11, 13), format="json")
@@ -189,6 +264,7 @@ class ReservationCreateTest(BaseTestCase):
         payload["end_datetime"] = self._make_dt(9).isoformat()
         response = self.client.post("/api/v1/reservations/", payload, format="json")
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
 
     def test_validation_error_not_30min_interval(self):
         payload = self._payload()
@@ -218,35 +294,79 @@ class ReservationCreateTest(BaseTestCase):
         self.assertEqual(response.data["status"], "confirmed")
 
 
-class ReservationListViewTest(BaseTestCase):
-    """GET /api/v1/reservations/"""
+# ─── 공개 API: GET /api/v1/reservations/ (페이징) ──────────────────────────────
 
+class ReservationListViewTest(BaseTestCase):
     def test_returns_reservations_by_name_and_phone(self):
         self._make_reservation()
         response = self.client.get("/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"})
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["results"]), 1)
 
     def test_no_results_for_wrong_phone(self):
         self._make_reservation()
         response = self.client.get("/api/v1/reservations/", {"name": "홍길동", "phone": "01099999999"})
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
     def test_400_when_params_missing(self):
         response = self.client.get("/api/v1/reservations/")
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
 
     def test_deleted_reservation_not_returned(self):
         r = self._make_reservation()
         r.is_deleted = True
         r.save()
         response = self.client.get("/api/v1/reservations/", {"name": "홍길동", "phone": "01012345678"})
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
+
+# ─── 공개 API: 현재/지난 예약 (페이징) ─────────────────────────────────────────
+
+class ReservationCurrentPastListViewTest(BaseTestCase):
+    """GET /api/v1/reservations/current/ , /past/ — now 기준 분리."""
+
+    def _make_future(self):
+        start = timezone.now() + datetime.timedelta(days=2)
+        return Reservation.objects.create(
+            space=self.space, applicant_name="홍길동", applicant_phone="01012345678",
+            custom_team_name="청년부", leader_phone="01098765432", headcount=5,
+            purpose="모임", start_datetime=start, end_datetime=start + datetime.timedelta(hours=1),
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def _make_past(self):
+        end = timezone.now() - datetime.timedelta(days=2)
+        return Reservation.objects.create(
+            space=self.space, applicant_name="홍길동", applicant_phone="01012345678",
+            custom_team_name="청년부", leader_phone="01098765432", headcount=5,
+            purpose="모임", start_datetime=end - datetime.timedelta(hours=1), end_datetime=end,
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def test_current_returns_future_only(self):
+        self._make_future()
+        self._make_past()
+        response = self.client.get("/api/v1/reservations/current/", {"name": "홍길동", "phone": "01012345678"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_past_returns_past_only(self):
+        self._make_future()
+        self._make_past()
+        response = self.client.get("/api/v1/reservations/past/", {"name": "홍길동", "phone": "01012345678"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_400_when_params_missing(self):
+        response = self.client.get("/api/v1/reservations/current/")
+        self.assertEqual(response.status_code, 400)
+
+
+# ─── 공개 API: GET /api/v1/spaces/<id>/reservations/ ──────────────────────────
 
 class SpaceReservationListViewTest(BaseTestCase):
-    """GET /api/v1/spaces/<id>/reservations/"""
-
     def test_returns_confirmed_reservations(self):
         self._make_reservation(10, 12)
         response = self.client.get(f"/api/v1/spaces/{self.space.pk}/reservations/", {"date": "2030-06-01"})
@@ -271,9 +391,9 @@ class SpaceReservationListViewTest(BaseTestCase):
         self.assertEqual(response.status_code, 400)
 
 
-class SpaceAvailabilityViewTest(BaseTestCase):
-    """GET /api/v1/spaces/availability/"""
+# ─── 공개 API: GET /api/v1/spaces/availability/ ───────────────────────────────
 
+class SpaceAvailabilityViewTest(BaseTestCase):
     BASE_URL = "/api/v1/spaces/availability/"
 
     def _params(self, **kwargs):
@@ -327,14 +447,107 @@ class SpaceAvailabilityViewTest(BaseTestCase):
             end_datetime="2030-06-01T10:00:00+09:00",
         ))
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
 
     def test_inactive_space_excluded(self):
         response = self.client.get(self.BASE_URL, self._params())
         ids = [r["id"] for r in response.data]
         self.assertNotIn(self.inactive_space.pk, ids)
 
+    def test_filter_by_building(self):
+        other_building = Building.objects.create(name="별관", is_active=True)
+        other_space = Space.objects.create(building=other_building, name="별관공간", is_active=True)
+        response = self.client.get(self.BASE_URL, self._params(building_id=other_building.pk))
+        ids = [r["id"] for r in response.data]
+        self.assertIn(other_space.pk, ids)
+        self.assertNotIn(self.space.pk, ids)
 
-# ─── Admin 인증 ───────────────────────────────────────────────────────────────
+
+# ─── 공개 API: POST /api/v1/reservations/<pk>/cancel/ ─────────────────────────
+
+class ReservationPublicCancelViewTest(BaseTestCase):
+    def test_cancel_success(self):
+        r = self._make_reservation()
+        response = self.client.post(
+            f"/api/v1/reservations/{r.pk}/cancel/",
+            {"name": "홍길동", "phone": "01012345678"}, format="json",
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "cancelled")
+
+    def test_400_when_params_missing(self):
+        r = self._make_reservation()
+        response = self.client.post(f"/api/v1/reservations/{r.pk}/cancel/", {}, format="json")
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
+
+    def test_403_when_identity_mismatch(self):
+        r = self._make_reservation()
+        response = self.client.post(
+            f"/api/v1/reservations/{r.pk}/cancel/",
+            {"name": "김철수", "phone": "01012345678"}, format="json",
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.data["error"], "forbidden")
+
+    def test_404_when_not_found(self):
+        response = self.client.post(
+            "/api/v1/reservations/9999/cancel/",
+            {"name": "홍길동", "phone": "01012345678"}, format="json",
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_400_already_cancelled(self):
+        r = self._make_reservation(status=Reservation.Status.CANCELLED)
+        response = self.client.post(
+            f"/api/v1/reservations/{r.pk}/cancel/",
+            {"name": "홍길동", "phone": "01012345678"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "already_cancelled")
+
+    def test_400_cannot_cancel_rejected(self):
+        r = self._make_reservation(status=Reservation.Status.REJECTED)
+        response = self.client.post(
+            f"/api/v1/reservations/{r.pk}/cancel/",
+            {"name": "홍길동", "phone": "01012345678"}, format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "cannot_cancel_rejected")
+
+
+# ─── 공개 API: GET /api/v1/reservations/<pk>/ticket/ ──────────────────────────
+
+class ReservationTicketViewTest(BaseTestCase):
+    """티켓 이미지 본문 생성 자체는 test_ticket_image.py가 담당하므로,
+    여기서는 엔드포인트의 인증/검증/응답 형식을 검증한다."""
+
+    def test_returns_png(self):
+        r = self._make_reservation()
+        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/",
+                                   {"name": "홍길동", "phone": "01012345678"})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertTrue(response.content.startswith(b"\x89PNG"))
+
+    def test_403_name_mismatch(self):
+        r = self._make_reservation()
+        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/",
+                                   {"name": "김철수", "phone": "01012345678"})
+        self.assertEqual(response.status_code, 403)
+
+    def test_400_missing_params(self):
+        r = self._make_reservation()
+        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/", {"name": "홍길동"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_404_not_found(self):
+        response = self.client.get("/api/v1/reservations/9999/ticket/",
+                                   {"name": "홍길동", "phone": "01012345678"})
+        self.assertEqual(response.status_code, 404)
+
+
+# ─── Admin 인증: POST /api/v1/admin/login/ ────────────────────────────────────
 
 class AdminLoginViewTest(BaseTestCase):
     def test_login_success(self):
@@ -350,61 +563,6 @@ class AdminLoginViewTest(BaseTestCase):
         self.assertEqual(response.data["error"], "unauthorized")
 
 
-# ─── Admin Leader CRUD ────────────────────────────────────────────────────────
-
-class AdminLeaderTest(BaseTestCase):
-    """GET·POST /admin/leaders/  |  PATCH·DELETE /admin/leaders/<pk>/"""
-
-    def setUp(self):
-        super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-
-    def test_list_all_leaders(self):
-        response = self.client.get("/api/v1/admin/leaders/")
-        self.assertEqual(response.status_code, 200)
-        self.assertGreaterEqual(len(response.data), 1)
-
-    def test_create_leader(self):
-        response = self.client.post("/api/v1/admin/leaders/",
-                                    {"name": "신규리더", "phone": "010-1234-5678"}, format="json")
-        self.assertEqual(response.status_code, 201)
-        self.assertEqual(response.data["name"], "신규리더")
-        self.assertTrue(response.data["is_active"])
-
-    def test_create_leader_missing_name_400(self):
-        response = self.client.post("/api/v1/admin/leaders/",
-                                    {"phone": "010-0000-0000"}, format="json")
-        self.assertEqual(response.status_code, 400)
-        self.assertEqual(response.data["error"], "validation_error")
-
-    def test_patch_leader(self):
-        response = self.client.patch(f"/api/v1/admin/leaders/{self.leader.pk}/",
-                                     {"name": "수정된리더"}, format="json")
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.data["name"], "수정된리더")
-
-    def test_patch_leader_not_found(self):
-        response = self.client.patch("/api/v1/admin/leaders/9999/",
-                                     {"name": "없음"}, format="json")
-        self.assertEqual(response.status_code, 404)
-        self.assertEqual(response.data["error"], "not_found")
-
-    def test_soft_delete_leader(self):
-        response = self.client.delete(f"/api/v1/admin/leaders/{self.leader.pk}/")
-        self.assertEqual(response.status_code, 204)
-        self.leader.refresh_from_db()
-        self.assertFalse(self.leader.is_active)
-
-    def test_soft_delete_not_found(self):
-        response = self.client.delete("/api/v1/admin/leaders/9999/")
-        self.assertEqual(response.status_code, 404)
-
-    def test_401_without_token(self):
-        self.client.credentials()
-        response = self.client.get("/api/v1/admin/leaders/")
-        self.assertEqual(response.status_code, 401)
-
-
 # ─── Admin Team CRUD ──────────────────────────────────────────────────────────
 
 class AdminTeamTest(BaseTestCase):
@@ -412,39 +570,52 @@ class AdminTeamTest(BaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
-        self.team = Team.objects.create(name="청년팀", category="청년회", leader=self.leader)
+        self._auth()
 
     def test_list_includes_inactive(self):
-        Team.objects.create(name="비활성팀", category="청년회", is_active=False)
+        Team.objects.create(
+            name="비활성팀", department=self.department, leader_phone="010-0000-0000", is_active=False
+        )
         response = self.client.get("/api/v1/admin/teams/")
         self.assertEqual(response.status_code, 200)
         names = [t["name"] for t in response.data]
         self.assertIn("비활성팀", names)
 
-    def test_list_includes_category_and_leader(self):
+    def test_list_includes_department_and_pastor(self):
         response = self.client.get("/api/v1/admin/teams/")
-        item = next(t for t in response.data if t["name"] == "청년팀")
-        self.assertEqual(item["category"], "청년회")
-        self.assertEqual(item["leader"]["name"], "홍길동 목사")
+        item = next(t for t in response.data if t["name"] == "청년1팀")
+        self.assertEqual(item["department"]["name"], "청년부")
+        self.assertEqual(item["pastor"]["name"], "홍길동")
+        self.assertIn("leader_phone", item)
 
     def test_create_team(self):
-        response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "신규팀", "category": "사역팀", "leader": self.leader.pk},
-                                    format="json")
+        response = self.client.post(
+            "/api/v1/admin/teams/",
+            {"name": "신규팀", "department": self.department.pk,
+             "pastor": self.pastor.pk, "leader_phone": "010-5555-6666"},
+            format="json",
+        )
         self.assertEqual(response.status_code, 201)
         self.assertEqual(response.data["name"], "신규팀")
-        self.assertEqual(response.data["leader"]["id"], self.leader.pk)
+        self.assertEqual(response.data["department"]["id"], self.department.pk)
+        self.assertEqual(response.data["pastor"]["id"], self.pastor.pk)
 
-    def test_create_team_missing_category_400(self):
-        response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "카테고리없음"}, format="json")
+    def test_create_team_missing_name_400(self):
+        response = self.client.post(
+            "/api/v1/admin/teams/",
+            {"department": self.department.pk, "leader_phone": "010-0000-0000"},
+            format="json",
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
-    def test_create_team_duplicate_name_400(self):
-        response = self.client.post("/api/v1/admin/teams/",
-                                    {"name": "청년팀", "category": "청년회"}, format="json")
+    def test_create_team_duplicate_name_in_department_400(self):
+        # unique_together = (department, name): 같은 부서에 "청년1팀" 중복
+        response = self.client.post(
+            "/api/v1/admin/teams/",
+            {"name": "청년1팀", "department": self.department.pk, "leader_phone": "010-0000-0000"},
+            format="json",
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
@@ -455,9 +626,9 @@ class AdminTeamTest(BaseTestCase):
         self.assertEqual(response.data["name"], "수정된팀")
 
     def test_patch_team_not_found(self):
-        response = self.client.patch("/api/v1/admin/teams/9999/",
-                                     {"name": "없음"}, format="json")
+        response = self.client.patch("/api/v1/admin/teams/9999/", {"name": "없음"}, format="json")
         self.assertEqual(response.status_code, 404)
+        self.assertEqual(response.data["error"], "not_found")
 
     def test_soft_delete_team(self):
         response = self.client.delete(f"/api/v1/admin/teams/{self.team.pk}/")
@@ -482,7 +653,7 @@ class AdminBuildingTest(BaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_list_includes_inactive(self):
         Building.objects.create(name="비활성건물", is_active=False)
@@ -509,8 +680,7 @@ class AdminBuildingTest(BaseTestCase):
         self.assertEqual(response.data["name"], "수정된건물")
 
     def test_patch_not_found(self):
-        response = self.client.patch("/api/v1/admin/buildings/9999/",
-                                     {"name": "없음"}, format="json")
+        response = self.client.patch("/api/v1/admin/buildings/9999/", {"name": "없음"}, format="json")
         self.assertEqual(response.status_code, 404)
 
     def test_soft_delete_building_with_no_active_spaces(self):
@@ -543,7 +713,7 @@ class AdminSpaceTest(BaseTestCase):
 
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_list_includes_inactive_and_all_buildings(self):
         response = self.client.get("/api/v1/admin/spaces/")
@@ -567,8 +737,7 @@ class AdminSpaceTest(BaseTestCase):
         self.assertEqual(response.data["building"]["id"], self.building.pk)
 
     def test_create_space_missing_required_400(self):
-        response = self.client.post("/api/v1/admin/spaces/",
-                                    {"floor": 1}, format="json")
+        response = self.client.post("/api/v1/admin/spaces/", {"floor": 1}, format="json")
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data["error"], "validation_error")
 
@@ -580,8 +749,7 @@ class AdminSpaceTest(BaseTestCase):
         self.assertEqual(response.data["capacity"], 100)
 
     def test_patch_not_found(self):
-        response = self.client.patch("/api/v1/admin/spaces/9999/",
-                                     {"name": "없음"}, format="json")
+        response = self.client.patch("/api/v1/admin/spaces/9999/", {"name": "없음"}, format="json")
         self.assertEqual(response.status_code, 404)
 
     def test_soft_delete_space(self):
@@ -600,54 +768,109 @@ class AdminSpaceTest(BaseTestCase):
         self.assertEqual(response.status_code, 401)
 
 
-# ─── Admin Reservation 기존 ────────────────────────────────────────────────────
+# ─── Admin Reservation 목록 (페이징) ───────────────────────────────────────────
 
 class AdminReservationListViewTest(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_returns_all_with_token(self):
         self._make_reservation()
         response = self.client.get("/api/v1/admin/reservations/")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
 
     def test_401_without_token(self):
         self.client.credentials()
         response = self.client.get("/api/v1/admin/reservations/")
         self.assertEqual(response.status_code, 401)
 
-    def test_filter_by_date(self):
+    def test_filter_by_date_range(self):
         self._make_reservation(day=1)
         self._make_reservation(start_hour=14, end_hour=16, day=2)
-        response = self.client.get("/api/v1/admin/reservations/", {"date": "2030-06-01"})
-        self.assertEqual(len(response.data), 1)
+        response = self.client.get(
+            "/api/v1/admin/reservations/",
+            {"from_date": "2030-06-01", "to_date": "2030-06-01"},
+        )
+        self.assertEqual(response.data["count"], 1)
 
     def test_filter_by_status(self):
         self._make_reservation(status=Reservation.Status.CONFIRMED)
         self._make_reservation(start_hour=14, end_hour=16, status=Reservation.Status.CANCELLED)
         response = self.client.get("/api/v1/admin/reservations/", {"status": "confirmed"})
-        self.assertEqual(len(response.data), 1)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_search_by_applicant_name(self):
+        self._make_reservation()
+        self._make_reservation(start_hour=14, end_hour=16, applicant_name="김철수")
+        response = self.client.get("/api/v1/admin/reservations/", {"search": "김철수"})
+        self.assertEqual(response.data["count"], 1)
 
     def test_deleted_not_returned(self):
         r = self._make_reservation()
         r.is_deleted = True
         r.save()
         response = self.client.get("/api/v1/admin/reservations/")
-        self.assertEqual(len(response.data), 0)
+        self.assertEqual(response.data["count"], 0)
 
-    def test_400_invalid_date_format(self):
-        response = self.client.get("/api/v1/admin/reservations/", {"date": "abc"})
+    def test_400_invalid_from_date_format(self):
+        response = self.client.get("/api/v1/admin/reservations/", {"from_date": "abc"})
         self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.data["error"], "validation_error")
 
 
-class AdminReservationDetailViewTest(BaseTestCase):
-    """GET /api/v1/admin/reservations/<pk>/"""
+# ─── Admin Reservation 현재/지난 ───────────────────────────────────────────────
 
+class AdminReservationCurrentPastListViewTest(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
+
+    def _make_future(self):
+        start = timezone.now() + datetime.timedelta(days=2)
+        return Reservation.objects.create(
+            space=self.space, applicant_name="홍길동", applicant_phone="01012345678",
+            custom_team_name="청년부", leader_phone="01098765432", headcount=5,
+            purpose="모임", start_datetime=start, end_datetime=start + datetime.timedelta(hours=1),
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def _make_past(self):
+        end = timezone.now() - datetime.timedelta(days=2)
+        return Reservation.objects.create(
+            space=self.space, applicant_name="홍길동", applicant_phone="01012345678",
+            custom_team_name="청년부", leader_phone="01098765432", headcount=5,
+            purpose="모임", start_datetime=end - datetime.timedelta(hours=1), end_datetime=end,
+            status=Reservation.Status.CONFIRMED,
+        )
+
+    def test_current_returns_future_only(self):
+        self._make_future()
+        self._make_past()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_past_returns_past_only(self):
+        self._make_future()
+        self._make_past()
+        response = self.client.get("/api/v1/admin/reservations/past/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_401_without_token(self):
+        self.client.credentials()
+        response = self.client.get("/api/v1/admin/reservations/current/")
+        self.assertEqual(response.status_code, 401)
+
+
+# ─── Admin Reservation 상세 (GET /admin/reservations/<pk>/) ───────────────────
+
+class AdminReservationDetailViewTest(BaseTestCase):
+    def setUp(self):
+        super().setUp()
+        self._auth()
 
     def test_get_detail(self):
         r = self._make_reservation()
@@ -675,12 +898,12 @@ class AdminReservationDetailViewTest(BaseTestCase):
         self.assertEqual(response.status_code, 401)
 
 
-class AdminReservationStatusViewTest(BaseTestCase):
-    """PATCH /api/v1/admin/reservations/<pk>/status/"""
+# ─── Admin Reservation 상태 변경 (PATCH .../status/) ──────────────────────────
 
+class AdminReservationStatusViewTest(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_pending_to_confirmed(self):
         r = self._make_reservation(status=Reservation.Status.PENDING)
@@ -705,7 +928,6 @@ class AdminReservationStatusViewTest(BaseTestCase):
         self.assertEqual(response.data["error"], "invalid_status_transition")
 
     def test_confirmed_with_conflict_returns_400(self):
-        # 이미 confirmed 예약이 있는 시간대에 pending→confirmed 시도
         self._make_reservation(10, 12, status=Reservation.Status.CONFIRMED)
         r = self._make_reservation(10, 12, status=Reservation.Status.PENDING)
         response = self.client.patch(f"/api/v1/admin/reservations/{r.pk}/status/",
@@ -732,12 +954,12 @@ class AdminReservationStatusViewTest(BaseTestCase):
         self.assertEqual(response.status_code, 401)
 
 
-class AdminReservationDeleteViewTest(BaseTestCase):
-    """DELETE /api/v1/admin/reservations/<pk>/"""
+# ─── Admin Reservation 소프트 삭제 (DELETE .../<pk>/) ─────────────────────────
 
+class AdminReservationDeleteViewTest(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_soft_delete(self):
         r = self._make_reservation()
@@ -764,12 +986,12 @@ class AdminReservationDeleteViewTest(BaseTestCase):
         self.assertEqual(response.status_code, 401)
 
 
-class AdminReservationCancelViewTest(BaseTestCase):
-    """POST /api/v1/admin/reservations/<pk>/cancel/"""
+# ─── Admin Reservation 취소 (POST .../cancel/) ────────────────────────────────
 
+class AdminReservationCancelViewTest(BaseTestCase):
     def setUp(self):
         super().setUp()
-        self.client.credentials(HTTP_AUTHORIZATION=f"Token {self.token.key}")
+        self._auth()
 
     def test_cancel_success(self):
         r = self._make_reservation()
@@ -777,6 +999,7 @@ class AdminReservationCancelViewTest(BaseTestCase):
                                     {"admin_note": "테스트 취소"}, format="json")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["status"], "cancelled")
+        self.assertEqual(response.data["admin_note"], "테스트 취소")
 
     def test_already_cancelled_400(self):
         r = self._make_reservation(status=Reservation.Status.CANCELLED)
@@ -794,31 +1017,8 @@ class AdminReservationCancelViewTest(BaseTestCase):
         response = self.client.post("/api/v1/admin/reservations/9999/cancel/", {}, format="json")
         self.assertEqual(response.status_code, 404)
 
-
-# ─── 티켓 ─────────────────────────────────────────────────────────────────────
-
-class ReservationTicketViewTest(BaseTestCase):
-    def test_returns_png(self):
+    def test_401_without_token(self):
+        self.client.credentials()
         r = self._make_reservation()
-        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/",
-                                   {"name": "홍길동", "phone": "01012345678"})
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response["Content-Type"], "image/png")
-        self.assertTrue(response.content.startswith(b"\x89PNG"))
-
-    def test_403_name_mismatch(self):
-        r = self._make_reservation()
-        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/",
-                                   {"name": "김철수", "phone": "01012345678"})
-        self.assertEqual(response.status_code, 403)
-
-    def test_400_missing_params(self):
-        r = self._make_reservation()
-        response = self.client.get(f"/api/v1/reservations/{r.pk}/ticket/",
-                                   {"name": "홍길동"})
-        self.assertEqual(response.status_code, 400)
-
-    def test_404_not_found(self):
-        response = self.client.get("/api/v1/reservations/9999/ticket/",
-                                   {"name": "홍길동", "phone": "01012345678"})
-        self.assertEqual(response.status_code, 404)
+        response = self.client.post(f"/api/v1/admin/reservations/{r.pk}/cancel/", {}, format="json")
+        self.assertEqual(response.status_code, 401)
