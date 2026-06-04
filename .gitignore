@@ -13,6 +13,10 @@ venv/
 # Node
 node_modules/
 
+# pnpm 워크스페이스 전용 — npm/yarn lockfile 유입 방지 (pnpm-lock.yaml 만 사용)
+package-lock.json
+yarn.lock
+
 # 빌드 결과물
 dist/
 build/
