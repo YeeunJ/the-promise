@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import { buildCompletedSteps } from '../utils/buildCompletedSteps';
-import type { ApplicantData } from '../components/reservation/ApplicantPopup';
-import type { SpaceSelection } from '../components/reservation/SpacePopup';
+import type { ApplicantData, SpaceSelection } from '../types/booking';
 import type { TimeSlotValue } from '../types';
 
 describe('buildCompletedSteps', () => {
   const mockApplicant: ApplicantData = {
     name: '홍길동',
     phone: '010-1234-5678',
-    departmentId: 'youth',
+    departmentId: 1,
     departmentName: '청년부',
-    teamId: 'youth-1',
+    teamId: 1,
     teamName: '1청년부',
+    customTeamName: null,
     pastorDisplay: '김요셉 전도사',
   };
 

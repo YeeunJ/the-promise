@@ -1,5 +1,4 @@
-import type { ApplicantData } from '../components/reservation/ApplicantPopup';
-import type { SpaceSelection } from '../components/reservation/SpacePopup';
+import type { ApplicantData, SpaceSelection } from '../types/booking';
 import type { TimeSlotValue } from '../types';
 import { formatDateStr, formatTime } from './formatDatetime';
 import { HEADCOUNT_OPTIONS } from '@/lib/constants';
