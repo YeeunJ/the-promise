@@ -96,7 +96,7 @@ def generate_ticket_image(reservation) -> Image.Image:
     rows = [
         ("신청자",      reservation.applicant_name),
         ("연락처",      reservation.applicant_phone),
-        ("팀",          reservation.applicant_team),
+        ("팀",          reservation.team.name if reservation.team else reservation.custom_team_name),
         ("리더 연락처", reservation.leader_phone),
         ("목적",        reservation.purpose),
         ("시작",        start_str),
