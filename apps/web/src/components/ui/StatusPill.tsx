@@ -1,16 +1,10 @@
 import type { ReservationStatus } from '../../types';
+import { STATUS_LABEL } from '../../lib/reservationStatus';
 
 interface StatusPillProps {
   status: ReservationStatus;
   size?: 'sm' | 'md';
 }
-
-const STATUS_LABEL: Record<ReservationStatus, string> = {
-  confirmed: '확정',
-  pending: '대기',
-  rejected: '거절',
-  cancelled: '취소',
-};
 
 const STATUS_CLASS: Record<ReservationStatus, string> = {
   confirmed: 'bg-status-confirmed-bg text-status-confirmed-fg',
