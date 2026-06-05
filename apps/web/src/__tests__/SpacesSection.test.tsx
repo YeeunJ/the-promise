@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
 vi.mock('axios');
@@ -61,7 +61,8 @@ describe('SpacesSection', () => {
     await waitFor(() => {
       expect(screen.getByText('드림홀')).toBeInTheDocument();
     });
-    expect(screen.getByText('본당')).toBeInTheDocument();
+    // '본당'은 chip 과 테이블 양쪽에 나타나므로 테이블 범위로 한정해 검증
+    expect(within(screen.getByRole('table')).getByText('본당')).toBeInTheDocument();
     expect(screen.getByText('3층')).toBeInTheDocument();
     expect(screen.getByText('500명')).toBeInTheDocument();
   });
@@ -141,6 +142,79 @@ describe('SpacesSection', () => {
     expect(showToast).toHaveBeenCalledWith('공간이 추가되었습니다.', 'success');
     await waitFor(() => {
       expect(screen.getByText('신규공간')).toBeInTheDocument();
+    });
+  });
+
+  describe('건물 chip 필터', () => {
+    it('전체 + 건물 chip 들이 렌더링된다', async () => {
+      setupGetMock(
+        [makeSpace()],
+        [
+          makeBuilding({ id: 1, name: '본당' }),
+          makeBuilding({ id: 2, name: '가나안홀' }),
+          makeBuilding({ id: 3, name: '무지개홀' }),
+        ],
+      );
+
+      render(<SpacesSection authToken="t" showToast={vi.fn()} />);
+
+      const chipBar = await screen.findByTestId('space-building-chip-filter');
+      expect(within(chipBar).getByRole('button', { name: '전체' })).toBeInTheDocument();
+      expect(within(chipBar).getByRole('button', { name: '본당' })).toBeInTheDocument();
+      expect(within(chipBar).getByRole('button', { name: '가나안홀' })).toBeInTheDocument();
+      expect(within(chipBar).getByRole('button', { name: '무지개홀' })).toBeInTheDocument();
+    });
+
+    it('건물 chip 클릭 시 해당 건물 공간만 표시한다', async () => {
+      setupGetMock(
+        [
+          makeSpace({ id: 1, name: '드림홀', building: { id: 1, name: '본당', description: null } }),
+          makeSpace({ id: 2, name: '에벤에셀홀', building: { id: 2, name: '가나안홀', description: null } }),
+        ],
+        [
+          makeBuilding({ id: 1, name: '본당' }),
+          makeBuilding({ id: 2, name: '가나안홀' }),
+        ],
+      );
+
+      render(<SpacesSection authToken="t" showToast={vi.fn()} />);
+      await waitFor(() => {
+        expect(screen.getByText('드림홀')).toBeInTheDocument();
+      });
+
+      const chipBar = screen.getByTestId('space-building-chip-filter');
+      const user = userEvent.setup();
+      await user.click(within(chipBar).getByRole('button', { name: '가나안홀' }));
+
+      expect(screen.getByText('에벤에셀홀')).toBeInTheDocument();
+      expect(screen.queryByText('드림홀')).not.toBeInTheDocument();
+    });
+
+    it('"전체" chip 클릭 시 모든 건물의 공간이 다시 표시된다', async () => {
+      setupGetMock(
+        [
+          makeSpace({ id: 1, name: '드림홀', building: { id: 1, name: '본당', description: null } }),
+          makeSpace({ id: 2, name: '에벤에셀홀', building: { id: 2, name: '가나안홀', description: null } }),
+        ],
+        [
+          makeBuilding({ id: 1, name: '본당' }),
+          makeBuilding({ id: 2, name: '가나안홀' }),
+        ],
+      );
+
+      render(<SpacesSection authToken="t" showToast={vi.fn()} />);
+      await waitFor(() => {
+        expect(screen.getByText('드림홀')).toBeInTheDocument();
+      });
+
+      const chipBar = screen.getByTestId('space-building-chip-filter');
+      const user = userEvent.setup();
+      await user.click(within(chipBar).getByRole('button', { name: '가나안홀' }));
+      expect(screen.queryByText('드림홀')).not.toBeInTheDocument();
+
+      await user.click(within(chipBar).getByRole('button', { name: '전체' }));
+      expect(screen.getByText('드림홀')).toBeInTheDocument();
+      expect(screen.getByText('에벤에셀홀')).toBeInTheDocument();
     });
   });
 
