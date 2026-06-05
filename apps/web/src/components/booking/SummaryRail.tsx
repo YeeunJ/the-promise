@@ -1,6 +1,7 @@
 import type { BookingDraft } from '../../hooks/useBookingDraft';
 import { HEADCOUNT_OPTIONS } from '@/lib/constants';
 import { formatDateStr, formatTime } from '../../utils/formatDatetime';
+import { FloorPlanCard } from './floorplan/FloorPlanCard';
 
 interface SummaryRailProps {
   draft: BookingDraft;
@@ -97,6 +98,8 @@ export function SummaryRail({ draft, isStepValid }: SummaryRailProps): JSX.Eleme
           </p>
         )}
       </div>
+
+      {draft.space && <FloorPlanCard space={draft.space} />}
     </div>
   );
 }
