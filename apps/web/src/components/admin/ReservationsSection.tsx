@@ -227,6 +227,8 @@ export function ReservationsSection({
   // --- 취소 ---
 
   function handleCancelRequest(id: number): void {
+    // 상세 모달을 먼저 닫아 취소 사유 입력 다이얼로그가 가려지지 않도록 한다.
+    setDetailTargetId(null);
     setCancelTargetId(id);
   }
 
