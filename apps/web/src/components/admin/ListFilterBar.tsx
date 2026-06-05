@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
+import { Building2, CalendarRange, ChevronDown } from 'lucide-react';
 import { getBuildingColor } from '../../lib/adminConstants';
 import { useDebouncedValue } from '../../hooks/useDebouncedValue';
 import type { Building } from '../../types';
@@ -26,6 +27,19 @@ const DATE_PRESET_LABELS: Record<DatePreset, string> = {
 
 function formatDateOnly(date: Date): string {
   return date.toISOString().slice(0, 10);
+}
+
+// 현재 적용된 날짜 필터 범위를 사람이 읽기 쉬운 문자열로 변환한다.
+// 프리셋/커스텀/외부 주입(달력 → 리스트) 무엇이든 실제 from~to를 그대로 보여준다.
+// 같은 연도면 종료일의 연도를 생략해 간결하게 표기한다. (예: 2026-06-05 ~ 06-12)
+function formatRangeLabel(from?: string, to?: string): string | null {
+  if (!from && !to) return null;
+  if (from && to) {
+    if (from === to) return from;
+    const toLabel = from.slice(0, 4) === to.slice(0, 4) ? to.slice(5) : to;
+    return `${from} ~ ${toLabel}`;
+  }
+  return from ? `${from} ~` : `~ ${to ?? ''}`;
 }
 
 function computePresetRange(preset: Exclude<DatePreset, 'custom'>): {
@@ -74,6 +88,17 @@ export function ListFilterBar({
     onFiltersChange({ ...filters, search: normalized });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [debouncedSearch]);
+
+  // 외부에서 날짜가 주입되거나(달력 → 리스트) 현재 프리셋 범위와 어긋나면
+  // 드롭다운 라벨을 '날짜선택'으로 맞춰 실제 적용 범위와 모순되지 않게 한다.
+  useEffect(() => {
+    if (datePreset === 'custom') return;
+    const { from, to } = computePresetRange(datePreset);
+    if (filters.from_date !== from || filters.to_date !== to) {
+      setDatePreset('custom');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filters.from_date, filters.to_date]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent): void {
@@ -124,7 +149,10 @@ export function ListFilterBar({
   const dropdownClass =
     'absolute top-full left-0 mt-1 bg-white rounded-xl shadow-lg border border-[#E5E7EB] p-3 z-50 min-w-[180px] max-h-[280px] overflow-y-auto';
 
-  const buildingButtonLabel = selectedBuilding ? selectedBuilding.name : '건물';
+  const selectedBuildingColor = selectedBuilding
+    ? getBuildingColor(selectedBuilding.name)
+    : null;
+  const rangeLabel = formatRangeLabel(filters.from_date, filters.to_date);
 
   const containerClass = isVertical
     ? 'flex flex-col gap-3 relative'
@@ -133,16 +161,44 @@ export function ListFilterBar({
   return (
     <div ref={containerRef} className={containerClass}>
       {/* Building filter */}
-      <div className="relative">
+      <div className={isVertical ? 'relative' : 'relative min-w-[190px]'}>
         <button
           type="button"
           aria-label="건물 필터"
-          className={isVertical ? `${btnClass} w-full text-left` : btnClass}
+          className="flex w-full items-center justify-between gap-2 border border-[#E5E7EB] rounded-t-xl px-3 py-2 bg-white text-left text-sm hover:bg-gray-50 transition-colors disabled:opacity-50"
           onClick={() => toggleDropdown('building')}
           disabled={isLoading}
         >
-          {buildingButtonLabel} ▼
+          <span>건물선택</span>
+          <ChevronDown
+            size={14}
+            className="text-gray-400 flex-none"
+            aria-hidden="true"
+          />
         </button>
+        <div className="flex items-center gap-1.5 rounded-b-xl border border-t-0 border-[#E5E7EB] bg-gray-50 px-3 py-1.5">
+          <Building2
+            size={13}
+            className="text-gray-400 flex-none"
+            aria-hidden="true"
+          />
+          {selectedBuilding && selectedBuildingColor ? (
+            <span
+              data-testid="building-selected-label"
+              className="text-[12px] font-medium"
+              style={{ color: selectedBuildingColor.main }}
+            >
+              {selectedBuilding.name}
+            </span>
+          ) : (
+            <span
+              data-testid="building-selected-label"
+              className="text-[12px] text-gray-600"
+            >
+              전체
+            </span>
+          )}
+        </div>
         {openDropdown === 'building' && (
           <div className={dropdownClass} data-testid="building-dropdown">
             <button
@@ -152,7 +208,7 @@ export function ListFilterBar({
               }`}
               onClick={() => handleBuildingSelect(undefined)}
             >
-              전체 건물
+              전체
             </button>
             {buildings.map((building) => {
               const color = getBuildingColor(building.name);
@@ -176,16 +232,36 @@ export function ListFilterBar({
       </div>
 
       {/* Date filter */}
-      <div className="relative">
+      <div className={isVertical ? 'relative' : 'relative min-w-[190px]'}>
         <button
           type="button"
           aria-label="기간 필터"
-          className={isVertical ? `${btnClass} w-full text-left` : btnClass}
+          className={`flex items-center justify-between gap-2 border border-[#E5E7EB] rounded-t-xl px-3 py-2 bg-white text-left text-sm hover:bg-gray-50 transition-colors disabled:opacity-50 ${
+            isVertical ? 'w-full' : 'w-full'
+          }`}
           onClick={() => toggleDropdown('date')}
           disabled={isLoading}
         >
-          {DATE_PRESET_LABELS[datePreset]} ▼
+          <span>{DATE_PRESET_LABELS[datePreset]}</span>
+          <ChevronDown
+            size={14}
+            className="text-gray-400 flex-none"
+            aria-hidden="true"
+          />
         </button>
+        <div className="flex items-center gap-1.5 rounded-b-xl border border-t-0 border-[#E5E7EB] bg-gray-50 px-3 py-1.5">
+          <CalendarRange
+            size={13}
+            className="text-gray-400 flex-none"
+            aria-hidden="true"
+          />
+          <span
+            data-testid="date-range-label"
+            className="text-[12px] text-gray-600 tabular-nums whitespace-nowrap"
+          >
+            {rangeLabel ?? '기간 선택'}
+          </span>
+        </div>
         {openDropdown === 'date' && (
           <div className={dropdownClass} data-testid="date-dropdown">
             {(['1w', '2w', '1m', 'custom'] as DatePreset[]).map((preset) => (

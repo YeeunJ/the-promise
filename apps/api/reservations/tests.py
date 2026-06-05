@@ -807,6 +807,60 @@ class AdminReservationListViewTest(BaseTestCase):
         response = self.client.get("/api/v1/admin/reservations/", {"search": "김철수"})
         self.assertEqual(response.data["count"], 1)
 
+    def test_search_phone_with_hyphen_matches_stored_without_hyphen(self):
+        # DB에는 하이픈 없이 저장(01012345678), 검색어에는 하이픈 포함.
+        self._make_reservation(applicant_phone="01012345678")
+        self._make_reservation(start_hour=14, end_hour=16, applicant_phone="01099998888")
+        response = self.client.get(
+            "/api/v1/admin/reservations/", {"search": "010-1234-5678"}
+        )
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["applicant_phone"], "01012345678")
+
+    def test_search_phone_without_hyphen_matches_stored_with_hyphen(self):
+        # DB에 하이픈 포함 저장, 검색어에는 하이픈 없음.
+        self._make_reservation(applicant_phone="010-1234-5678")
+        self._make_reservation(start_hour=14, end_hour=16, applicant_phone="01099998888")
+        response = self.client.get(
+            "/api/v1/admin/reservations/", {"search": "01012345678"}
+        )
+        self.assertEqual(response.data["count"], 1)
+
+    def test_search_partial_phone_digits(self):
+        self._make_reservation(applicant_phone="01012345678")
+        self._make_reservation(start_hour=14, end_hour=16, applicant_phone="01099998888")
+        response = self.client.get("/api/v1/admin/reservations/", {"search": "1234"})
+        self.assertEqual(response.data["count"], 1)
+
+    def test_ordering_by_headcount_ascending(self):
+        self._make_reservation(headcount=30)
+        self._make_reservation(start_hour=14, end_hour=16, headcount=5)
+        response = self.client.get(
+            "/api/v1/admin/reservations/", {"ordering": "headcount"}
+        )
+        headcounts = [r["headcount"] for r in response.data["results"]]
+        self.assertEqual(headcounts, [5, 30])
+
+    def test_ordering_by_applicant_name_descending(self):
+        self._make_reservation(applicant_name="가나")
+        self._make_reservation(start_hour=14, end_hour=16, applicant_name="하늘")
+        response = self.client.get(
+            "/api/v1/admin/reservations/", {"ordering": "-applicant_name"}
+        )
+        names = [r["applicant_name"] for r in response.data["results"]]
+        self.assertEqual(names, ["하늘", "가나"])
+
+    def test_ordering_invalid_falls_back_to_default(self):
+        self._make_reservation(day=1)
+        self._make_reservation(start_hour=14, end_hour=16, day=2)
+        response = self.client.get(
+            "/api/v1/admin/reservations/", {"ordering": "evil; DROP TABLE"}
+        )
+        self.assertEqual(response.status_code, 200)
+        # 기본 정렬 -start_datetime (최신 우선)
+        dates = [r["start_datetime"][:10] for r in response.data["results"]]
+        self.assertEqual(dates, sorted(dates, reverse=True))
+
     def test_deleted_not_returned(self):
         r = self._make_reservation()
         r.is_deleted = True

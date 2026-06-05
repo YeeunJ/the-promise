@@ -7,6 +7,8 @@ interface AdminSideRailProps {
   reservations: ReadonlyArray<Reservation>;
   selectedDate: string | null;
   onReservationClick: (reservation: Reservation) => void;
+  // 선택된 날짜로 필터링된 리스트뷰로 이동한다.
+  onMoreClick?: (date: string) => void;
 }
 
 const MAX_ITEMS = 8;
@@ -15,6 +17,7 @@ export function AdminSideRail({
   reservations,
   selectedDate,
   onReservationClick,
+  onMoreClick,
 }: AdminSideRailProps): JSX.Element {
   const dateItems = selectedDate
     ? reservations
@@ -66,8 +69,17 @@ export function AdminSideRail({
               </li>
             ))}
             {dateItems.length > MAX_ITEMS && (
-              <li className="text-[11px] text-ink-mute">
-                +{dateItems.length - MAX_ITEMS}건 더 있음
+              <li className="flex items-center justify-between gap-2 text-[11px] text-ink-mute">
+                <span>+{dateItems.length - MAX_ITEMS}건 더 있음</span>
+                {selectedDate && onMoreClick && (
+                  <button
+                    type="button"
+                    onClick={() => onMoreClick(selectedDate)}
+                    className="rounded-md px-2 py-1 text-[11px] font-semibold text-primary hover:bg-primary-50"
+                  >
+                    리스트로 더 보기 →
+                  </button>
+                )}
               </li>
             )}
           </ul>
