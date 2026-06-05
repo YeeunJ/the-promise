@@ -4,16 +4,14 @@ import { getBuildingColor } from '../../lib/adminConstants';
 import { isCancellable } from '../../lib/reservationUtils';
 import { StatusBadge } from '../ui/StatusBadge';
 
-type DateOrdering = 'start_datetime' | '-start_datetime';
-
 interface ListTableProps {
   reservations: Reservation[];
   onCancelRequest: (id: number) => void;
   onDetailRequest: (id: number) => void;
   // 정렬은 서버(백엔드 ordering 파라미터)가 책임. 둘 다 함께 전달되면
-  // "날짜" 헤더가 토글 가능한 컨트롤로 바뀐다.
-  ordering?: DateOrdering;
-  onOrderingChange?: (next: DateOrdering) => void;
+  // 정렬 가능한 컬럼 헤더가 토글 컨트롤로 바뀐다. 형식: 'field'(오름) | '-field'(내림)
+  ordering?: string;
+  onOrderingChange?: (next: string) => void;
   // 빈 결과 메시지에 컨텍스트로 노출할 현재 검색어
   searchQuery?: string;
 }
@@ -25,46 +23,77 @@ function formatShortDate(isoString: string): string {
   return `${month}.${day}`;
 }
 
-const STATIC_HEADERS = [
-  '건물', '장소', '시간', '이름', '부서', '인원', '목적', '상태', '액션',
-] as const;
-
-interface DateHeaderProps {
-  ordering: DateOrdering | undefined;
-  onOrderingChange: ((next: DateOrdering) => void) | undefined;
+interface HeaderConfig {
+  label: string;
+  // 백엔드 ordering 필드. 지정 시 정렬 가능 컬럼이 된다.
+  // 날짜·시간은 모두 start_datetime 기준(통합 정렬)이다.
+  field?: string;
 }
 
-function DateHeader({
+const HEADERS: readonly HeaderConfig[] = [
+  { label: '날짜', field: 'start_datetime' },
+  { label: '건물', field: 'space__building__name' },
+  { label: '장소' },
+  { label: '시간', field: 'start_datetime' },
+  { label: '이름', field: 'applicant_name' },
+  { label: '부서' },
+  { label: '인원', field: 'headcount' },
+  { label: '목적' },
+  { label: '상태', field: 'status' },
+  { label: '액션' },
+] as const;
+
+function parseOrdering(
+  ordering: string | undefined,
+): { field: string; desc: boolean } | null {
+  if (!ordering) return null;
+  const desc = ordering.startsWith('-');
+  return { field: desc ? ordering.slice(1) : ordering, desc };
+}
+
+interface SortableHeaderProps {
+  config: HeaderConfig;
+  ordering: string | undefined;
+  onOrderingChange: ((next: string) => void) | undefined;
+}
+
+function SortableHeader({
+  config,
   ordering,
   onOrderingChange,
-}: DateHeaderProps): JSX.Element {
-  const sortable = ordering !== undefined && onOrderingChange !== undefined;
+}: SortableHeaderProps): JSX.Element {
+  const thClass =
+    'px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left';
+  const sortable = config.field !== undefined && onOrderingChange !== undefined;
 
-  if (!sortable) {
-    return (
-      <th className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left">
-        날짜
-      </th>
-    );
+  if (!sortable || config.field === undefined) {
+    return <th className={thClass}>{config.label}</th>;
   }
 
-  const isDesc = ordering === '-start_datetime';
-  const ariaSort = isDesc ? 'descending' : 'ascending';
-  const icon = isDesc ? '↓' : '↑';
-  const next: DateOrdering = isDesc ? 'start_datetime' : '-start_datetime';
+  const parsed = parseOrdering(ordering);
+  const isActive = parsed?.field === config.field;
+  const isDesc = isActive && parsed.desc;
+  // 비활성 컬럼 → 오름차순부터. 활성 컬럼 → 방향 토글.
+  const next = !isActive
+    ? config.field
+    : isDesc
+      ? config.field
+      : `-${config.field}`;
+  const ariaSort = isActive ? (isDesc ? 'descending' : 'ascending') : 'none';
+  const icon = isActive ? (isDesc ? '↓' : '↑') : '↕';
 
   return (
-    <th
-      aria-sort={ariaSort}
-      className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left"
-    >
+    <th aria-sort={ariaSort} className={thClass}>
       <button
         type="button"
         onClick={() => onOrderingChange(next)}
         className="inline-flex items-center gap-1 hover:text-primary transition-colors"
       >
-        날짜
-        <span aria-hidden="true" className="text-primary text-[10px]">
+        {config.label}
+        <span
+          aria-hidden="true"
+          className={`text-[10px] ${isActive ? 'text-primary' : 'text-gray-300'}`}
+        >
           {icon}
         </span>
       </button>
@@ -99,17 +128,13 @@ export function ListTable({
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-gray-50 z-10">
             <tr>
-              <DateHeader
-                ordering={ordering}
-                onOrderingChange={onOrderingChange}
-              />
-              {STATIC_HEADERS.map((header) => (
-                <th
-                  key={header}
-                  className="px-3 py-2 text-xs font-medium text-gray-500 uppercase text-left"
-                >
-                  {header}
-                </th>
+              {HEADERS.map((config, index) => (
+                <SortableHeader
+                  key={`${config.label}-${String(index)}`}
+                  config={config}
+                  ordering={ordering}
+                  onOrderingChange={onOrderingChange}
+                />
               ))}
             </tr>
           </thead>
