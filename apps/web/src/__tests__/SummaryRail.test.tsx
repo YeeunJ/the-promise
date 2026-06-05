@@ -63,4 +63,18 @@ describe('SummaryRail', () => {
     render(<SummaryRail draft={emptyDraft} isStepValid={(s) => s === 1} />);
     expect(screen.queryByText(/채워질 때마다/)).not.toBeInTheDocument();
   });
+
+  it('장소 미선택이면 평면도 카드를 표시하지 않는다', () => {
+    render(<SummaryRail draft={emptyDraft} isStepValid={() => false} />);
+    expect(screen.queryByText(/평면도/)).not.toBeInTheDocument();
+  });
+
+  it('장소 선택 시 평면도 카드를 표시한다', () => {
+    const draft: BookingDraft = {
+      ...emptyDraft,
+      space: { id: 1, buildingName: '본당', floor: 1, spaceName: '자람뜰홀' },
+    };
+    render(<SummaryRail draft={draft} isStepValid={(s) => s === 3} />);
+    expect(screen.getByText('본당 · 1F 평면도')).toBeInTheDocument();
+  });
 });
