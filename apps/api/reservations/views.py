@@ -1,10 +1,12 @@
 import datetime
 import io
+import re
 from collections import defaultdict
 from math import ceil
 
 from django.contrib.auth import authenticate
-from django.db.models import Prefetch, Q
+from django.db.models import Prefetch, Q, Value
+from django.db.models.functions import Replace
 from django.http import HttpResponse
 from django.utils import timezone
 from drf_spectacular.utils import OpenApiParameter, OpenApiResponse, extend_schema, inline_serializer
@@ -749,6 +751,20 @@ def _admin_validation_error(errors):
     return Response({"error": "validation_error", "message": msg}, status=status.HTTP_400_BAD_REQUEST)
 
 
+# 리스트뷰에서 정렬 가능한 컬럼 화이트리스트. 각 필드의 오름/내림차순을 모두 허용한다.
+# (날짜와 시간은 start_datetime 기준으로 동일하게 처리한다.)
+_ADMIN_ORDERING_FIELDS = (
+    "start_datetime",
+    "space__building__name",
+    "applicant_name",
+    "headcount",
+    "status",
+)
+ADMIN_RESERVATION_ORDERINGS = frozenset(
+    field for base in _ADMIN_ORDERING_FIELDS for field in (base, f"-{base}")
+)
+
+
 def _build_admin_reservation_qs(params):
     """Admin 예약 목록 공통 필터 + 정렬 적용 QuerySet 반환."""
     qs = (
@@ -793,11 +809,23 @@ def _build_admin_reservation_qs(params):
                 status=status.HTTP_400_BAD_REQUEST,
             )
     if search := params.get("search"):
-        qs = qs.filter(
-            Q(applicant_name__icontains=search) | Q(applicant_phone__icontains=search)
+        search_filter = Q(applicant_name__icontains=search) | Q(
+            applicant_phone__icontains=search
         )
+        # 전화번호는 하이픈/공백 유무와 무관하게 검색되도록 숫자만 비교한다.
+        digits = re.sub(r"\D", "", search)
+        if digits:
+            qs = qs.annotate(
+                _phone_digits=Replace(
+                    Replace("applicant_phone", Value("-"), Value("")),
+                    Value(" "),
+                    Value(""),
+                )
+            )
+            search_filter |= Q(_phone_digits__icontains=digits)
+        qs = qs.filter(search_filter)
     ordering = params.get("ordering", "-start_datetime")
-    if ordering not in ("start_datetime", "-start_datetime"):
+    if ordering not in ADMIN_RESERVATION_ORDERINGS:
         ordering = "-start_datetime"
     return qs.order_by(ordering), None
 

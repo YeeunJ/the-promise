@@ -257,6 +257,58 @@ describe('ListTable', () => {
       ).not.toBeInTheDocument();
       expect(screen.getByText('날짜')).toBeInTheDocument();
     });
+
+    it('건물·시간·이름·인원·상태 헤더가 정렬 버튼이 된다', () => {
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="-start_datetime"
+          onOrderingChange={vi.fn()}
+        />,
+      );
+
+      for (const label of ['건물', '시간', '이름', '인원', '상태']) {
+        expect(
+          screen.getByRole('button', { name: new RegExp(label) }),
+        ).toBeInTheDocument();
+      }
+    });
+
+    it('비활성 컬럼(건물) 클릭 시 오름차순부터 정렬한다', async () => {
+      const handle = vi.fn();
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="-start_datetime"
+          onOrderingChange={handle}
+        />,
+      );
+
+      await userEvent.click(screen.getByRole('button', { name: /건물/ }));
+      expect(handle).toHaveBeenCalledWith('space__building__name');
+    });
+
+    it('활성 컬럼(인원, 오름차순) 클릭 시 내림차순으로 토글한다', async () => {
+      const handle = vi.fn();
+      render(
+        <ListTable
+          reservations={[]}
+          onCancelRequest={vi.fn()}
+          onDetailRequest={vi.fn()}
+          ordering="headcount"
+          onOrderingChange={handle}
+        />,
+      );
+
+      const header = screen.getByRole('columnheader', { name: /인원/ });
+      expect(header).toHaveAttribute('aria-sort', 'ascending');
+      await userEvent.click(screen.getByRole('button', { name: /인원/ }));
+      expect(handle).toHaveBeenCalledWith('-headcount');
+    });
   });
 
   describe('취소하기 버튼', () => {

@@ -37,6 +37,28 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
     vi.useRealTimers();
   });
 
+  // --- 날짜 범위 표시 ---
+
+  it('선택된 날짜 범위(from~to)를 표시한다 (같은 연도는 종료일 연도 생략)', () => {
+    render(<ListFilterBar {...createDefaultProps()} />);
+    expect(screen.getByTestId('date-range-label')).toHaveTextContent(
+      '2026-04-16 ~ 04-23',
+    );
+  });
+
+  it('from_date 와 to_date 가 같으면 단일 날짜로 표시한다', () => {
+    render(
+      <ListFilterBar
+        {...createDefaultProps({
+          filters: { from_date: '2026-06-06', to_date: '2026-06-06' },
+        })}
+      />,
+    );
+    expect(screen.getByTestId('date-range-label')).toHaveTextContent(
+      '2026-06-06',
+    );
+  });
+
   // --- 기본 렌더링 ---
 
   it('건물 / 기간 / 검색 세 개 영역이 렌더링된다', () => {
@@ -58,13 +80,13 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
   // --- 건물 필터 (단일 선택) ---
 
   describe('건물 필터', () => {
-    it('드롭다운에 "전체 건물" + 건물들이 표시된다', async () => {
+    it('드롭다운에 "전체" + 건물들이 표시된다', async () => {
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(<ListFilterBar {...createDefaultProps()} />);
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
 
-      expect(screen.getByRole('button', { name: '전체 건물' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '전체' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '본당' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '가나안홀' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: '무지개홀' })).toBeInTheDocument();
@@ -89,7 +111,7 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
       );
     });
 
-    it('"전체 건물" 선택 시 building_id 가 undefined 로 통보된다', async () => {
+    it('"전체" 선택 시 building_id 가 undefined 로 통보된다', async () => {
       const onFiltersChange = vi.fn();
       const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
       render(
@@ -102,13 +124,13 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
       );
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
-      await user.click(screen.getByRole('button', { name: '전체 건물' }));
+      await user.click(screen.getByRole('button', { name: '전체' }));
 
       const arg = onFiltersChange.mock.calls[0][0];
       expect(arg.building_id).toBeUndefined();
     });
 
-    it('선택된 건물명이 버튼 라벨에 표시된다', () => {
+    it('선택된 건물명이 선택값 박스에 표시된다', () => {
       render(
         <ListFilterBar
           {...createDefaultProps({
@@ -117,8 +139,17 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
         />,
       );
 
-      const trigger = screen.getByRole('button', { name: '건물 필터' });
-      expect(trigger.textContent).toContain('가나안홀');
+      expect(screen.getByTestId('building-selected-label')).toHaveTextContent(
+        '가나안홀',
+      );
+    });
+
+    it('선택된 건물이 없으면 박스에 "전체"를 표시한다', () => {
+      render(<ListFilterBar {...createDefaultProps()} />);
+
+      expect(screen.getByTestId('building-selected-label')).toHaveTextContent(
+        '전체',
+      );
     });
   });
 
@@ -311,11 +342,11 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
       render(<ListFilterBar {...createDefaultProps()} />);
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
-      expect(screen.getByRole('button', { name: '전체 건물' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '전체' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: '기간 필터' }));
       expect(
-        screen.queryByRole('button', { name: '전체 건물' }),
+        screen.queryByRole('button', { name: '전체' }),
       ).not.toBeInTheDocument();
       expect(screen.getByTestId('date-dropdown')).toBeInTheDocument();
     });
@@ -325,11 +356,11 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
       render(<ListFilterBar {...createDefaultProps()} />);
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
-      expect(screen.getByRole('button', { name: '전체 건물' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '전체' })).toBeInTheDocument();
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
       expect(
-        screen.queryByRole('button', { name: '전체 건물' }),
+        screen.queryByRole('button', { name: '전체' }),
       ).not.toBeInTheDocument();
     });
 
@@ -343,11 +374,11 @@ describe('ListFilterBar (서버 필터 시그니처)', () => {
       );
 
       await user.click(screen.getByRole('button', { name: '건물 필터' }));
-      expect(screen.getByRole('button', { name: '전체 건물' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: '전체' })).toBeInTheDocument();
 
       await user.click(screen.getByTestId('outside'));
       expect(
-        screen.queryByRole('button', { name: '전체 건물' }),
+        screen.queryByRole('button', { name: '전체' }),
       ).not.toBeInTheDocument();
     });
   });

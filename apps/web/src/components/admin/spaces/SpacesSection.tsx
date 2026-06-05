@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { AdminSpace, AdminSpaceWritePayload } from '../../../types';
 import { useAdminSpaces } from '../../../hooks/useAdminSpaces';
 import { useAdminBuildings } from '../../../hooks/useAdminBuildings';
@@ -43,6 +43,13 @@ export function SpacesSection({
 
   const [deleteTarget, setDeleteTarget] = useState<AdminSpace | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // 건물 chip 필터
+  const [activeBuildingId, setActiveBuildingId] = useState<number | null>(null);
+  const filteredSpaces = useMemo(() => {
+    if (activeBuildingId === null) return spaces;
+    return spaces.filter((s) => s.building.id === activeBuildingId);
+  }, [spaces, activeBuildingId]);
 
   function handleAdd(): void {
     setFormMode('create');
@@ -153,6 +160,27 @@ export function SpacesSection({
         </div>
       )}
 
+      {!isLoading && buildings.length > 0 && (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-2"
+          data-testid="space-building-chip-filter"
+        >
+          <BuildingChip
+            label="전체"
+            isActive={activeBuildingId === null}
+            onClick={() => setActiveBuildingId(null)}
+          />
+          {buildings.map((building) => (
+            <BuildingChip
+              key={building.id}
+              label={building.name}
+              isActive={activeBuildingId === building.id}
+              onClick={() => setActiveBuildingId(building.id)}
+            />
+          ))}
+        </div>
+      )}
+
       {isLoading ? (
         <div className="space-y-2">
           <div className="animate-pulse bg-gray-200 rounded h-10" />
@@ -161,7 +189,7 @@ export function SpacesSection({
         </div>
       ) : (
         <SpaceListTable
-          spaces={spaces}
+          spaces={filteredSpaces}
           onEdit={handleEdit}
           onDelete={handleDeleteRequest}
         />
@@ -193,5 +221,33 @@ export function SpacesSection({
         isLoading={isDeleting}
       />
     </div>
+  );
+}
+
+interface BuildingChipProps {
+  label: string;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+function BuildingChip({
+  label,
+  isActive,
+  onClick,
+}: BuildingChipProps): JSX.Element {
+  return (
+    <button
+      type="button"
+      aria-pressed={isActive}
+      onClick={onClick}
+      className={
+        'rounded-full px-3.5 py-1.5 text-[12px] font-bold tracking-[-0.01em] transition-colors ' +
+        (isActive
+          ? 'bg-primary text-white shadow-design-primary'
+          : 'bg-surface text-ink-soft border border-edge hover:bg-primary-50')
+      }
+    >
+      {label}
+    </button>
   );
 }

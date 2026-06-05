@@ -286,11 +286,22 @@ export function ReservationsSection({
     setListPage(1);
   }
 
-  function handleOrderingChange(
-    next: 'start_datetime' | '-start_datetime',
-  ): void {
+  function handleOrderingChange(next: string): void {
     setListFilters({ ...listFilters, ordering: next });
     setListPage(1);
+  }
+
+  // 달력 사이드 패널에서 "리스트로 더 보기" 클릭 시: 해당 날짜로 필터를 적용하며
+  // 리스트뷰로 전환한다. 과거 날짜면 '지난' 탭, 그 외에는 '예정' 탭으로 보낸다.
+  function handleListMoreFromCalendar(date: string): void {
+    setListTab(date < todayStr ? 'past' : 'current');
+    setListFilters({
+      from_date: date,
+      to_date: date,
+      ordering: '-start_datetime',
+    });
+    setListPage(1);
+    setViewMode('list');
   }
 
   const detailReservation =
@@ -333,10 +344,7 @@ export function ReservationsSection({
 
   const headerActionBtn =
     'rounded-xl px-3 py-1.5 text-sm font-medium border border-[#E5E7EB] text-gray-700 bg-white hover:bg-gray-50 transition-colors';
-  const currentOrdering: 'start_datetime' | '-start_datetime' =
-    listFilters.ordering === 'start_datetime'
-      ? 'start_datetime'
-      : '-start_datetime';
+  const currentOrdering: string = listFilters.ordering ?? '-start_datetime';
 
   // 이번 주 (월-일) 범위 계산
   const todayDate = new Date(`${todayStr}T00:00:00+09:00`);
@@ -445,6 +453,7 @@ export function ReservationsSection({
               reservations={calendarReservations}
               selectedDate={selectedDate}
               onReservationClick={(r) => setDetailTargetId(r.id)}
+              onMoreClick={handleListMoreFromCalendar}
             />
           </div>
         </div>
