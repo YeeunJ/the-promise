@@ -3,7 +3,6 @@
 Pillow + qrcode 를 사용해 CGV 모바일 티켓 스타일의 PNG를 생성합니다.
 """
 
-import io
 import os
 
 import qrcode
