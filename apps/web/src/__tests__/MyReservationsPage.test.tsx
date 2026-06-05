@@ -92,7 +92,7 @@ describe('MyReservationsPage', () => {
     expect(screen.getByText('취소')).toBeInTheDocument();
   });
 
-  it('current/past API 응답으로 KPI 값 반영', async () => {
+  it('KPI는 예정(미래) 예약만 집계하고 지난 예약은 제외한다', async () => {
     seedCreds();
     mockedAxios.get.mockImplementation((url: string) => {
       if (url.includes('current')) {
@@ -103,6 +103,7 @@ describe('MyReservationsPage', () => {
           ]),
         });
       }
+      // 지난 내역의 취소 1건 — 상태 카드에 포함되면 안 된다.
       return Promise.resolve({
         data: makePaginated([makeReservation({ id: 3, status: 'cancelled' })]),
       });
@@ -111,9 +112,82 @@ describe('MyReservationsPage', () => {
 
     await waitFor(() => {
       expect(screen.getByTestId('kpi-upcoming')).toHaveTextContent('2');
-      expect(screen.getByTestId('kpi-confirmed')).toHaveTextContent('1');
-      expect(screen.getByTestId('kpi-pending')).toHaveTextContent('1');
-      expect(screen.getByTestId('kpi-cancelled')).toHaveTextContent('1');
+    });
+    expect(screen.getByTestId('kpi-confirmed')).toHaveTextContent('1');
+    expect(screen.getByTestId('kpi-pending')).toHaveTextContent('1');
+    // 지난 내역의 취소 건은 카드 집계에서 제외된다.
+    expect(screen.getByTestId('kpi-cancelled')).toHaveTextContent('0');
+  });
+
+  it('미래 예약의 취소 건은 취소 카드에 집계된다', async () => {
+    seedCreds();
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('current')) {
+        return Promise.resolve({
+          data: makePaginated([
+            makeReservation({ id: 1, status: 'confirmed' }),
+            makeReservation({ id: 2, status: 'cancelled' }),
+          ]),
+        });
+      }
+      return Promise.resolve({ data: makePaginated([]) });
+    });
+    renderPage();
+
+    await waitFor(() => {
+      // 예정(활성) = confirmed 1 (취소 제외)
+      expect(screen.getByTestId('kpi-upcoming')).toHaveTextContent('1');
+    });
+    expect(screen.getByTestId('kpi-cancelled')).toHaveTextContent('1');
+  });
+
+  it('지난 내역이 페이지 크기를 초과하면 더보기로 추가 로드된다', async () => {
+    seedCreds();
+    const makePast = (start: number, n: number): Reservation[] =>
+      Array.from({ length: n }, (_, i) =>
+        makeReservation({
+          id: start + i,
+          status: 'confirmed',
+          start_datetime: '2020-01-01T10:00:00+09:00',
+          end_datetime: '2020-01-01T11:00:00+09:00',
+        }),
+      );
+    const firstPage = makePast(100, 20);
+    const secondPage = makePast(200, 5);
+    mockedAxios.get.mockImplementation(
+      (url: string, config?: { params?: { page?: number } }) => {
+        if (url.includes('current')) {
+          return Promise.resolve({ data: makePaginated([]) });
+        }
+        const page = config?.params?.page ?? 1;
+        return Promise.resolve({
+          data: {
+            count: 25,
+            page,
+            page_size: 20,
+            total_pages: 2,
+            results: page === 1 ? firstPage : secondPage,
+          },
+        });
+      },
+    );
+    const user = userEvent.setup();
+    renderPage();
+
+    // 토글 버튼에 전체 건수(25) 표시
+    const toggle = await screen.findByText(/지난 내역 보기 \(25건\)/);
+    await user.click(toggle);
+
+    // 더보기 버튼: 현재 20 / 전체 25
+    const loadMore = await screen.findByRole('button', { name: /더보기/ });
+    expect(loadMore).toHaveTextContent('20/25');
+    await user.click(loadMore);
+
+    // 전체 로드 후 더보기 버튼 사라짐
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: /더보기/ }),
+      ).not.toBeInTheDocument();
     });
   });
 
