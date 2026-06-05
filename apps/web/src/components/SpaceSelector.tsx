@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import axios from 'axios';
 import type { BuildingWithSpaces, Space, SpaceAvailabilityItem } from '../types';
+import type { FloorPlanLocation } from '../types/booking';
 
 interface SpaceSelectorProps {
   value: number | null;
@@ -9,6 +10,8 @@ interface SpaceSelectorProps {
   availabilityMap?: Map<number, SpaceAvailabilityItem> | null;
   /** 선택한 시간대의 예약 가용성을 아직 조회 중인지 여부. true 동안 공간 선택을 막는다. */
   availabilityLoading?: boolean;
+  /** 현재 보고 있는 건물+층이 바뀔 때 호출한다. (평면도 표시 기준으로 사용) */
+  onLocationChange?: (location: FloorPlanLocation) => void;
 }
 
 function groupByFloor(spaces: Space[]): Map<number | null, Space[]> {
@@ -79,12 +82,15 @@ function formatHHMM(isoStr: string): string {
   return isoStr.slice(11, 16);
 }
 
-export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap, availabilityLoading = false }: SpaceSelectorProps): JSX.Element {
+export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap, availabilityLoading = false, onLocationChange }: SpaceSelectorProps): JSX.Element {
   const [buildings, setBuildings] = useState<BuildingWithSpaces[]>([]);
   const [selectedBuildingId, setSelectedBuildingId] = useState<number | null>(null);
   const [selectedFloor, setSelectedFloor] = useState<number | null | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const onLocationChangeRef = useRef(onLocationChange);
+  onLocationChangeRef.current = onLocationChange;
 
   useEffect(() => {
     setIsLoading(true);
@@ -107,6 +113,15 @@ export function SpaceSelector({ value, onChange, onSpaceSelect, availabilityMap,
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // 현재 보고 있는 건물+층이 정해지면(초기 기본 선택 포함) 상위에 통지한다.
+  // 층 미선택(undefined) 상태에서는 평면도 기준이 모호하므로 통지하지 않는다.
+  useEffect(() => {
+    if (selectedBuildingId === null || selectedFloor === undefined) return;
+    const building = buildings.find((b) => b.id === selectedBuildingId);
+    if (!building) return;
+    onLocationChangeRef.current?.({ buildingName: building.name, floor: selectedFloor });
+  }, [selectedBuildingId, selectedFloor, buildings]);
 
   const selectedBuilding = buildings.find((b) => b.id === selectedBuildingId) ?? null;
   const floorMap = selectedBuilding ? groupByFloor(selectedBuilding.spaces) : new Map<number | null, Space[]>();

@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import type { FloorPlanLocation } from '../types/booking';
 import { StickyHeader } from '../components/booking/StickyHeader';
 import { StepPanel } from '../components/booking/StepPanel';
 import { StepLockedRow } from '../components/booking/StepLockedRow';
@@ -22,6 +23,8 @@ const STEPS = [
 export function BookingPage(): JSX.Element {
   const navigate = useNavigate();
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  // 공간 선택 단계에서 현재 보고 있는 건물+층. 평면도 표시 기준(선택 확정과 무관).
+  const [viewingLocation, setViewingLocation] = useState<FloorPlanLocation | null>(null);
 
   const flow = useStepFlow();
   const stepRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -104,6 +107,7 @@ export function BookingPage(): JSX.Element {
                         value={flow.draft.space}
                         onChange={flow.updateSpace}
                         timeSlot={flow.draft.timeSlot}
+                        onLocationChange={setViewingLocation}
                       />
                     )}
                     {i === 3 && (
@@ -119,7 +123,11 @@ export function BookingPage(): JSX.Element {
           </div>
 
           {/* Summary rail */}
-          <SummaryRail draft={flow.draft} isStepValid={flow.isStepValid} />
+          <SummaryRail
+            draft={flow.draft}
+            isStepValid={flow.isStepValid}
+            viewingLocation={viewingLocation}
+          />
         </div>
       </main>
 

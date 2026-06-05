@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import type { Space, TimeSlotValue } from '../../../types';
-import type { SpaceSelection } from '../../../types/booking';
+import type { FloorPlanLocation, SpaceSelection } from '../../../types/booking';
 import { SpaceSelector } from '../../SpaceSelector';
 import { useSpaceAvailability } from '../../../hooks/useSpaceAvailability';
 
@@ -8,6 +8,8 @@ interface SpaceStepProps {
   value: SpaceSelection | null;
   onChange: (selection: SpaceSelection) => void;
   timeSlot: TimeSlotValue | null;
+  /** 현재 보고 있는 건물+층 변경 통지 (평면도 표시 기준). */
+  onLocationChange?: (location: FloorPlanLocation) => void;
 }
 
 function spaceToSelection(space: Space): SpaceSelection {
@@ -19,7 +21,7 @@ function spaceToSelection(space: Space): SpaceSelection {
   };
 }
 
-export function SpaceStep({ value, onChange, timeSlot }: SpaceStepProps): JSX.Element {
+export function SpaceStep({ value, onChange, timeSlot, onLocationChange }: SpaceStepProps): JSX.Element {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
@@ -42,6 +44,7 @@ export function SpaceStep({ value, onChange, timeSlot }: SpaceStepProps): JSX.El
         onSpaceSelect={handleSpaceSelect}
         availabilityMap={availabilityMap}
         availabilityLoading={isLoading}
+        onLocationChange={onLocationChange}
       />
     </section>
   );

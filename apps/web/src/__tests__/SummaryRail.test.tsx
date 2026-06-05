@@ -64,17 +64,53 @@ describe('SummaryRail', () => {
     expect(screen.queryByText(/채워질 때마다/)).not.toBeInTheDocument();
   });
 
-  it('장소 미선택이면 평면도 카드를 표시하지 않는다', () => {
+  it('보고 있는 위치(viewingLocation)가 없으면 평면도 카드를 표시하지 않는다', () => {
     render(<SummaryRail draft={emptyDraft} isStepValid={() => false} />);
     expect(screen.queryByText(/평면도/)).not.toBeInTheDocument();
   });
 
-  it('장소 선택 시 평면도 카드를 표시한다', () => {
+  it('보고 있는 위치가 있으면 장소 선택 전에도 평면도 카드를 표시한다', () => {
+    render(
+      <SummaryRail
+        draft={emptyDraft}
+        isStepValid={() => false}
+        viewingLocation={{ buildingName: '본당', floor: 1 }}
+      />,
+    );
+    expect(screen.getByText('본당 · 1F 평면도')).toBeInTheDocument();
+  });
+
+  it('보고 있는 층에 확정 장소가 있으면 그 방을 강조한다', () => {
     const draft: BookingDraft = {
       ...emptyDraft,
       space: { id: 1, buildingName: '본당', floor: 1, spaceName: '자람뜰홀' },
     };
-    render(<SummaryRail draft={draft} isStepValid={(s) => s === 3} />);
-    expect(screen.getByText('본당 · 1F 평면도')).toBeInTheDocument();
+    const { container } = render(
+      <SummaryRail
+        draft={draft}
+        isStepValid={(s) => s === 3}
+        viewingLocation={{ buildingName: '본당', floor: 1 }}
+      />,
+    );
+    expect(container.querySelector('[data-room="자람뜰홀"]')?.getAttribute('data-selected')).toBe(
+      'true',
+    );
+  });
+
+  it('확정 장소와 다른 건물/층을 보고 있으면 그 위치의 평면도를 강조 없이 표시한다', () => {
+    const draft: BookingDraft = {
+      ...emptyDraft,
+      space: { id: 1, buildingName: '본당', floor: 1, spaceName: '자람뜰홀' },
+    };
+    render(
+      <SummaryRail
+        draft={draft}
+        isStepValid={(s) => s === 3}
+        viewingLocation={{ buildingName: '가나안홀', floor: -1 }}
+      />,
+    );
+    // 헤더는 보고 있는 위치를 따라가고(본당 아님), 평면도는 미등록이라 준비중 안내
+    expect(screen.getByText('가나안홀 · 지하1F 평면도')).toBeInTheDocument();
+    expect(screen.getByText('평면도 준비중입니다')).toBeInTheDocument();
   });
 });
