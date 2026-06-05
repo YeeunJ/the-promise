@@ -78,6 +78,20 @@ describe('SpaceStep', () => {
     expect(onChange).toHaveBeenCalledWith(expected);
   });
 
+  it('초기 렌더 시 onLocationChange 가 기본 건물/층으로 호출된다', async () => {
+    mockedAxios.get.mockResolvedValueOnce({ data: makeBuildings() });
+    const { SpaceStep } = await import('../components/booking/steps/SpaceStep');
+
+    const onLocationChange = vi.fn();
+    render(
+      <SpaceStep value={null} onChange={vi.fn()} timeSlot={null} onLocationChange={onLocationChange} />,
+    );
+
+    await waitFor(() => {
+      expect(onLocationChange).toHaveBeenCalledWith({ buildingName: '본당', floor: 1 });
+    });
+  });
+
   it('value 가 주어지면 해당 공간이 selected 로 시각 표시', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: makeBuildings() });
     const { SpaceStep } = await import('../components/booking/steps/SpaceStep');

@@ -1,4 +1,5 @@
 import type { BookingDraft } from '../../hooks/useBookingDraft';
+import type { FloorPlanLocation } from '../../types/booking';
 import { HEADCOUNT_OPTIONS } from '@/lib/constants';
 import { formatDateStr, formatTime } from '../../utils/formatDatetime';
 import { FloorPlanCard } from './floorplan/FloorPlanCard';
@@ -6,6 +7,8 @@ import { FloorPlanCard } from './floorplan/FloorPlanCard';
 interface SummaryRailProps {
   draft: BookingDraft;
   isStepValid: (step: number) => boolean;
+  /** 현재 보고 있는 건물+층. 있으면 그 위치의 평면도를 표시한다. */
+  viewingLocation?: FloorPlanLocation | null;
 }
 
 interface RailItem {
@@ -45,9 +48,18 @@ function buildItems(draft: BookingDraft, isStepValid: (step: number) => boolean)
   ];
 }
 
-export function SummaryRail({ draft, isStepValid }: SummaryRailProps): JSX.Element {
+export function SummaryRail({ draft, isStepValid, viewingLocation = null }: SummaryRailProps): JSX.Element {
   const items = buildItems(draft, isStepValid);
   const filledCount = items.filter((item) => item.filled).length;
+
+  // 보고 있는 층에 확정 장소가 있을 때만 그 방을 강조한다(층이 다르면 강조 없음).
+  const highlightedSpaceName =
+    viewingLocation &&
+    draft.space &&
+    draft.space.buildingName === viewingLocation.buildingName &&
+    draft.space.floor === viewingLocation.floor
+      ? draft.space.spaceName
+      : '';
 
   return (
     <div className="sticky top-[110px] w-[280px]">
@@ -99,7 +111,13 @@ export function SummaryRail({ draft, isStepValid }: SummaryRailProps): JSX.Eleme
         )}
       </div>
 
-      {draft.space && <FloorPlanCard space={draft.space} />}
+      {viewingLocation && (
+        <FloorPlanCard
+          buildingName={viewingLocation.buildingName}
+          floor={viewingLocation.floor}
+          selectedSpaceName={highlightedSpaceName}
+        />
+      )}
     </div>
   );
 }

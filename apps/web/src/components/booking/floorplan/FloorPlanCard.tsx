@@ -1,17 +1,28 @@
-import type { SpaceSelection } from '../../../types/booking';
 import { getFloorPlan, floorPlanFloorLabel } from './floorPlanRegistry';
 
 interface FloorPlanCardProps {
-  space: SpaceSelection;
+  buildingName: string;
+  floor: number | null;
+  /**
+   * 현재 보고 있는 층에 선택된 장소가 있을 때만 그 방 이름을 전달한다.
+   * 빈 문자열이면 강조 없이 평면도만 표시한다.
+   */
+  selectedSpaceName?: string;
 }
 
 /**
- * 선택한 장소의 위치를 보여주는 평면도 카드 (읽기 전용).
+ * 현재 보고 있는 건물·층의 평면도를 보여주는 카드 (읽기 전용).
  * 등록된 평면도가 있으면 표시하고, 없으면 같은 자리에 "평면도 준비중입니다" 안내를 보여준다.
+ * 장소 확정과 무관하게 buildingName/floor 기준으로 평면도를 고르며,
+ * selectedSpaceName 이 있을 때만 해당 방을 강조한다.
  */
-export function FloorPlanCard({ space }: FloorPlanCardProps): JSX.Element {
-  const Plan = getFloorPlan(space.buildingName, space.floor);
-  const headerLabel = `${space.buildingName} · ${floorPlanFloorLabel(space.floor)} 평면도`;
+export function FloorPlanCard({
+  buildingName,
+  floor,
+  selectedSpaceName = '',
+}: FloorPlanCardProps): JSX.Element {
+  const Plan = getFloorPlan(buildingName, floor);
+  const headerLabel = `${buildingName} · ${floorPlanFloorLabel(floor)} 평면도`;
 
   return (
     <div className="mt-4 bg-surface rounded-2xl border border-edge shadow-design-md p-5">
@@ -23,7 +34,7 @@ export function FloorPlanCard({ space }: FloorPlanCardProps): JSX.Element {
       </div>
 
       {Plan ? (
-        <Plan selectedSpaceName={space.spaceName} />
+        <Plan selectedSpaceName={selectedSpaceName} />
       ) : (
         <div className="flex items-center justify-center rounded-xl border border-dashed border-edge bg-surface-2 py-12">
           <p className="text-xs text-ink-mute">평면도 준비중입니다</p>
