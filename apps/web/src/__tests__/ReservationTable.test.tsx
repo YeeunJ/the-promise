@@ -372,6 +372,78 @@ describe('ReservationTable — 레이아웃 안정성', () => {
   });
 });
 
+// ── 지난 내역 더보기(페이징) ──────────────────────────────────────────────
+describe('ReservationTable — 지난 내역 더보기', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('totalPastCount로 지난 내역 보기 버튼에 전체 건수가 표시된다', () => {
+    const past = [makeReservation({ id: 1, status: 'confirmed' })];
+    render(
+      <ReservationTable {...defaultProps} past={past} totalPastCount={25} />,
+    );
+    expect(screen.getByText(/지난 내역 보기 \(25건\)/)).toBeInTheDocument();
+  });
+
+  it('hasMorePast=true면 펼친 뒤 더보기 버튼이 보이고 클릭 시 onLoadMorePast 호출', async () => {
+    const user = userEvent.setup();
+    const onLoadMorePast = vi.fn();
+    const past = [makeReservation({ id: 1, status: 'confirmed' })];
+    render(
+      <ReservationTable
+        {...defaultProps}
+        past={past}
+        totalPastCount={25}
+        hasMorePast
+        onLoadMorePast={onLoadMorePast}
+      />,
+    );
+
+    await user.click(screen.getByText(/지난 내역 보기/));
+    await user.click(screen.getByRole('button', { name: /더보기/ }));
+
+    expect(onLoadMorePast).toHaveBeenCalledTimes(1);
+  });
+
+  it('hasMorePast=false면 더보기 버튼이 표시되지 않는다 (boundary case)', async () => {
+    const user = userEvent.setup();
+    const past = [makeReservation({ id: 1, status: 'confirmed' })];
+    render(
+      <ReservationTable
+        {...defaultProps}
+        past={past}
+        totalPastCount={1}
+        hasMorePast={false}
+      />,
+    );
+
+    await user.click(screen.getByText(/지난 내역 보기/));
+    expect(
+      screen.queryByRole('button', { name: /더보기/ }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('isLoadingMorePast=true면 더보기 버튼이 비활성화되고 로딩 문구가 표시된다', async () => {
+    const user = userEvent.setup();
+    const past = [makeReservation({ id: 1, status: 'confirmed' })];
+    render(
+      <ReservationTable
+        {...defaultProps}
+        past={past}
+        totalPastCount={25}
+        hasMorePast
+        isLoadingMorePast
+        onLoadMorePast={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText(/지난 내역 보기/));
+    const more = screen.getByRole('button', { name: /불러오는 중/ });
+    expect(more).toBeDisabled();
+  });
+});
+
 // ── Phase 4: TicketButton 피드백 개선 ─────────────────────────────────────
 describe('ReservationTable — TicketButton 상태 피드백', () => {
   beforeEach(() => {

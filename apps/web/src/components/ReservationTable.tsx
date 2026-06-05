@@ -17,6 +17,14 @@ interface ReservationTableProps {
   onGoToApply: () => void;
   onCancelSuccess: () => void;
   onRowClick?: (reservation: Reservation) => void;
+  /** 서버 기준 지난 내역 전체 건수 (현재 로드된 past.length와 다를 수 있음). */
+  totalPastCount?: number;
+  /** 아직 더 불러올 지난 내역이 남아있는지 여부. */
+  hasMorePast?: boolean;
+  /** 지난 내역 추가 로드 진행 중 여부. */
+  isLoadingMorePast?: boolean;
+  /** 지난 내역 "더보기" 클릭 핸들러. */
+  onLoadMorePast?: () => void;
 }
 
 async function downloadTicket(reservationId: number, credentials: Credentials): Promise<void> {
@@ -429,11 +437,16 @@ function ReservationTable({
   onGoToApply,
   onCancelSuccess,
   onRowClick,
+  totalPastCount,
+  hasMorePast = false,
+  isLoadingMorePast = false,
+  onLoadMorePast,
 }: ReservationTableProps): JSX.Element {
   const [showPast, setShowPast] = useState(false);
   const activeUpcoming = upcoming.filter(
     (r) => r.status !== 'cancelled' && r.status !== 'rejected',
   );
+  const pastCountLabel = totalPastCount ?? past.length;
 
   if (activeUpcoming.length === 0 && past.length === 0) {
     return <EmptyState onGoToApply={onGoToApply} />;
@@ -472,7 +485,7 @@ function ReservationTable({
           >
             {showPast
               ? `지난 내역 숨기기`
-              : `지난 내역 보기 (${past.length}건)`}
+              : `지난 내역 보기 (${pastCountLabel}건)`}
           </button>
 
           {showPast && (
@@ -483,6 +496,19 @@ function ReservationTable({
                 onCancelSuccess={onCancelSuccess}
                 onRowClick={onRowClick}
               />
+
+              {hasMorePast && onLoadMorePast !== undefined && (
+                <button
+                  type="button"
+                  onClick={onLoadMorePast}
+                  disabled={isLoadingMorePast}
+                  className="mt-3 w-full py-2.5 text-sm text-gray-500 border border-dashed border-gray-300 rounded-xl hover:border-gray-400 hover:text-gray-700 transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isLoadingMorePast
+                    ? '불러오는 중…'
+                    : `더보기 (${past.length}/${pastCountLabel})`}
+                </button>
+              )}
             </div>
           )}
         </div>
