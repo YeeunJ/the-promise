@@ -1,5 +1,6 @@
 import datetime
 import io
+from collections import defaultdict
 from math import ceil
 
 from django.contrib.auth import authenticate
@@ -24,7 +25,6 @@ from .serializers import (
     AdminTeamWriteSerializer,
     BuildingWithSpacesSerializer,
     DepartmentSerializer,
-    OverlappingSlotSerializer,
     ReservationCancelSerializer,
     ReservationCreateSerializer,
     ReservationQuerySerializer,
@@ -127,17 +127,31 @@ class SpaceAvailabilityView(APIView):
         if "keyword" in data:
             spaces = spaces.filter(name__icontains=data["keyword"])
 
+        # 모든 공간의 겹치는 예약을 단 1번의 쿼리로 조회한 뒤 space_id 별로 그룹핑한다.
+        # (공간마다 쿼리를 날리던 N+1 패턴 제거 → 쿼리 수를 2번으로 고정)
+        space_list = list(spaces)
+        space_ids = [space.id for space in space_list]
+
+        overlapping_rows = (
+            Reservation.objects.filter(
+                space_id__in=space_ids,
+                status=Reservation.Status.CONFIRMED,
+                is_deleted=False,
+                start_datetime__lt=E,
+                end_datetime__gt=S,
+            ).values("space_id", "start_datetime", "end_datetime")
+        )
+
+        overlapping_by_space: dict[int, list[dict]] = defaultdict(list)
+        for row in overlapping_rows:
+            overlapping_by_space[row["space_id"]].append({
+                "start_datetime": row["start_datetime"],
+                "end_datetime":   row["end_datetime"],
+            })
+
         results = []
-        for space in spaces:
-            overlapping = list(
-                Reservation.objects.filter(
-                    space=space,
-                    status=Reservation.Status.CONFIRMED,
-                    is_deleted=False,
-                    start_datetime__lt=E,
-                    end_datetime__gt=S,
-                ).values("start_datetime", "end_datetime")
-            )
+        for space in space_list:
+            overlapping = overlapping_by_space.get(space.id, [])
 
             if not overlapping:
                 availability = "full"
