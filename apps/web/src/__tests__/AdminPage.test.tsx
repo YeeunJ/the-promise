@@ -119,7 +119,7 @@ describe('AdminPage', () => {
     setupLoggedIn();
     mockFetchReservations();
     render(<AdminPage />);
-    expect(screen.getByText('가나안교회')).toBeInTheDocument();
+    expect(screen.getByAltText('가나안교회')).toBeInTheDocument();
     expect(screen.getByText('ADMIN')).toBeInTheDocument();
   });
 
