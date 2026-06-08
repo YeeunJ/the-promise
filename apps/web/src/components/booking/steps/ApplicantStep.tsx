@@ -8,7 +8,7 @@ import type { DepartmentSelection } from '../../reservation/DepartmentSelector';
 
 interface ApplicantStepProps {
   value: ApplicantData | null;
-  onChange: (data: ApplicantData) => void;
+  onChange: (data: ApplicantData | null) => void;
 }
 
 function toDepartmentSelection(data: ApplicantData): DepartmentSelection {
@@ -52,7 +52,7 @@ function buildApplicantData(
 
 export function ApplicantStep({ value, onChange }: ApplicantStepProps): JSX.Element {
   const [name, setName] = useState<string>(value?.name ?? '');
-  const [phone, setPhone] = useState<string>(value?.phone ?? '010-');
+  const [phone, setPhone] = useState<string>(value?.phone ?? '');
   const [department, setDepartment] = useState<DepartmentSelection | null>(
     value ? toDepartmentSelection(value) : null,
   );
@@ -60,26 +60,31 @@ export function ApplicantStep({ value, onChange }: ApplicantStepProps): JSX.Elem
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  function emitIfValid(n: string, p: string, d: DepartmentSelection | null): void {
+  // Emit the latest applicant data, or null when a previously-valid entry
+  // becomes incomplete — so the parent draft clears and the step blocks again.
+  function emit(n: string, p: string, d: DepartmentSelection | null): void {
     const data = buildApplicantData(n, p, d);
-    if (data) onChangeRef.current(data);
+    if (data) {
+      onChangeRef.current(data);
+    } else if (value !== null) {
+      onChangeRef.current(null);
+    }
   }
 
   function handleNameChange(v: string): void {
     setName(v);
-    emitIfValid(v, phone, department);
+    emit(v, phone, department);
   }
 
   function handlePhoneChange(raw: string): void {
-    const normalized = normalizePhone(raw);
-    const next = normalized.startsWith('010') ? normalized : '010-';
+    const next = normalizePhone(raw);
     setPhone(next);
-    emitIfValid(name, next, department);
+    emit(name, next, department);
   }
 
   function handleDepartmentChange(next: DepartmentSelection): void {
     setDepartment(next);
-    emitIfValid(name, phone, next);
+    emit(name, phone, next);
   }
 
   // Hydrate when value changes from outside (e.g. draft restore on revisit)

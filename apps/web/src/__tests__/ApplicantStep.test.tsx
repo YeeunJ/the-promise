@@ -93,7 +93,7 @@ describe('ApplicantStep', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
-  it('잘못된 전화 형식 (불완전) 이면 onChange 호출되지 않음', async () => {
+  it('잘못된 전화 형식 (불완전) 이면 유효 신청자 데이터가 전파되지 않음', async () => {
     const user = userEvent.setup();
     const onChange = vi.fn();
     // 이름은 있지만 phone 불완전
@@ -109,6 +109,20 @@ describe('ApplicantStep', () => {
     await user.click(screen.getByRole('button', { name: '청년부' }));
     await user.click(screen.getByRole('button', { name: '1청년' }));
 
-    expect(onChange).not.toHaveBeenCalled();
+    expect(onChange).not.toHaveBeenCalledWith(
+      expect.objectContaining({ teamId: 11 }),
+    );
+  });
+
+  it('유효 입력 후 이름을 비우면 onChange(null) 호출 (신청 차단)', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ApplicantStep value={filled} onChange={onChange} />);
+
+    await user.clear(screen.getByDisplayValue('홍길동'));
+
+    await waitFor(() => {
+      expect(onChange).toHaveBeenCalledWith(null);
+    });
   });
 });
