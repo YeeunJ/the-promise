@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { Button } from '../components/ui/Button';
 import { useBoardData } from '../hooks/useBoardData';
 import { useBoardClock } from '../hooks/useBoardClock';
 import {
@@ -18,6 +21,7 @@ const ROTATE_MS = 5000;
 const SELECT_ALL = -1;
 
 export function BoardPage(): JSX.Element {
+  const navigate = useNavigate();
   const { data, isLoading, error } = useBoardData();
   const clock = useBoardClock(data?.now ?? null);
 
@@ -98,8 +102,11 @@ export function BoardPage(): JSX.Element {
   return (
     <div className="min-h-screen bg-canvas px-10 pb-16 pt-8">
       <div className="mx-auto max-w-[1180px]">
-        <div className="mb-6">
+        <div className="mb-6 flex items-center justify-between gap-4">
           <h1 className="text-[28px] font-extrabold tracking-[-0.03em] text-ink">실시간 예약 현황</h1>
+          <Button size="sm" onClick={() => navigate('/booking')} iconRight={<ArrowRight size={16} />}>
+            장소 사용 신청하기
+          </Button>
         </div>
 
         {isLoading ? (
