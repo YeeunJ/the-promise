@@ -8,7 +8,7 @@ interface SpaceListTableProps {
   onDelete: (space: AdminSpace) => void;
 }
 
-type SortKey = 'name' | 'building' | 'capacity';
+type SortKey = 'name' | 'building' | 'capacity' | 'floor';
 type SortDir = 'asc' | 'desc';
 
 interface SortableHeaderProps {
@@ -72,6 +72,10 @@ export function SpaceListTable({
       const aVal = a.capacity ?? -1;
       const bVal = b.capacity ?? -1;
       cmp = aVal - bVal;
+    } else if (sortKey === 'floor') {
+      const aVal = a.floor ?? -1;
+      const bVal = b.floor ?? -1;
+      cmp = aVal - bVal;
     } else {
       cmp = a.name.localeCompare(b.name, 'ko');
     }
@@ -93,7 +97,7 @@ export function SpaceListTable({
           <tr>
             <SortableHeader label="건물" sortKey="building" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
             <SortableHeader label="공간명" sortKey="name" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
-            <th scope="col" className="px-4 py-3 text-left font-medium">층</th>
+            <SortableHeader label="층" sortKey="floor" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
             <SortableHeader label="정원" sortKey="capacity" currentKey={sortKey} currentDir={sortDir} onSort={handleSort} />
             <th scope="col" className="px-4 py-3 text-right font-medium">관리</th>
           </tr>
