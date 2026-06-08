@@ -1,8 +1,8 @@
-import type { BookingDraft } from '../../hooks/useBookingDraft';
-import type { FloorPlanLocation } from '../../types/booking';
-import { HEADCOUNT_OPTIONS } from '@/lib/constants';
-import { formatDateStr, formatTime } from '../../utils/formatDatetime';
-import { FloorPlanCard } from './floorplan/FloorPlanCard';
+import type { BookingDraft } from "../../hooks/useBookingDraft";
+import type { FloorPlanLocation } from "../../types/booking";
+import { HEADCOUNT_OPTIONS } from "@/lib/constants";
+import { formatDateStr, formatTime } from "../../utils/formatDatetime";
+import { FloorPlanCard } from "./floorplan/FloorPlanCard";
 
 interface SummaryRailProps {
   draft: BookingDraft;
@@ -17,18 +17,22 @@ interface RailItem {
   filled: boolean;
 }
 
-function buildItems(draft: BookingDraft, isStepValid: (step: number) => boolean): RailItem[] {
+function buildItems(
+  draft: BookingDraft,
+  isStepValid: (step: number) => boolean,
+): RailItem[] {
   const applicantValue = draft.applicant
     ? `${draft.applicant.name} · ${draft.applicant.phone}\n${draft.applicant.departmentName}`
     : null;
 
   const spaceValue = draft.space
-    ? `${draft.space.buildingName}${draft.space.floor !== null ? ` ${draft.space.floor}층` : ''} · 수용 ${draft.space.spaceName}`
+    ? `${draft.space.buildingName}${draft.space.floor !== null ? ` ${draft.space.floor}층` : ""} · ${draft.space.spaceName}`
     : null;
 
   const headcountValue =
     draft.headcount > 0
-      ? (HEADCOUNT_OPTIONS.find((o) => o.value === draft.headcount)?.label ?? `${draft.headcount}명`)
+      ? (HEADCOUNT_OPTIONS.find((o) => o.value === draft.headcount)?.label ??
+        `${draft.headcount}명`)
       : null;
 
   const timeSlot = draft.timeSlot;
@@ -40,15 +44,19 @@ function buildItems(draft: BookingDraft, isStepValid: (step: number) => boolean)
   const purposeValue = draft.purpose.trim() || null;
 
   return [
-    { label: '신청자', value: applicantValue, filled: isStepValid(1) },
-    { label: '일시', value: timeValue, filled: isStepValid(2) },
-    { label: '장소', value: spaceValue, filled: isStepValid(3) },
-    { label: '인원', value: headcountValue, filled: isStepValid(4) },
-    { label: '사용 목적', value: purposeValue, filled: isStepValid(5) },
+    { label: "신청자", value: applicantValue, filled: isStepValid(1) },
+    { label: "일시", value: timeValue, filled: isStepValid(2) },
+    { label: "장소", value: spaceValue, filled: isStepValid(3) },
+    { label: "인원", value: headcountValue, filled: isStepValid(4) },
+    { label: "사용 목적", value: purposeValue, filled: isStepValid(5) },
   ];
 }
 
-export function SummaryRail({ draft, isStepValid, viewingLocation = null }: SummaryRailProps): JSX.Element {
+export function SummaryRail({
+  draft,
+  isStepValid,
+  viewingLocation = null,
+}: SummaryRailProps): JSX.Element {
   const items = buildItems(draft, isStepValid);
   const filledCount = items.filter((item) => item.filled).length;
 
@@ -59,7 +67,7 @@ export function SummaryRail({ draft, isStepValid, viewingLocation = null }: Summ
     draft.space.buildingName === viewingLocation.buildingName &&
     draft.space.floor === viewingLocation.floor
       ? draft.space.spaceName
-      : '';
+      : "";
 
   return (
     <div className="sticky top-[110px] w-[280px]">
@@ -85,7 +93,11 @@ export function SummaryRail({ draft, isStepValid, viewingLocation = null }: Summ
                       strokeWidth={2.5}
                       aria-hidden="true"
                     >
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M2 6l3 3 5-5"
+                      />
                     </svg>
                   </div>
                 ) : (
@@ -93,9 +105,13 @@ export function SummaryRail({ draft, isStepValid, viewingLocation = null }: Summ
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-semibold text-ink-soft mb-0.5">{item.label}</div>
+                <div className="text-xs font-semibold text-ink-soft mb-0.5">
+                  {item.label}
+                </div>
                 {item.value ? (
-                  <div className="text-xs text-ink whitespace-pre-line">{item.value}</div>
+                  <div className="text-xs text-ink whitespace-pre-line">
+                    {item.value}
+                  </div>
                 ) : (
                   <div className="text-xs text-ink-mute">선택 전</div>
                 )}
