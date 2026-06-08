@@ -12,7 +12,7 @@ describe('AdminTopNav', () => {
         onLogout={vi.fn()}
       />,
     );
-    expect(screen.getByText('가나안교회')).toBeInTheDocument();
+    expect(screen.getByAltText('가나안교회')).toBeInTheDocument();
     expect(screen.getByText('ADMIN')).toBeInTheDocument();
   });
 

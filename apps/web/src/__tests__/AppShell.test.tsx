@@ -41,7 +41,7 @@ describe('AppShell', () => {
 
   it('renders header brand label and current outlet child', () => {
     renderWith('/');
-    expect(screen.getByText('가나안교회')).toBeInTheDocument();
+    expect(screen.getByAltText('가나안교회')).toBeInTheDocument();
     expect(screen.getByText('장소 사용 신청')).toBeInTheDocument();
     expect(screen.getByTestId('landing')).toBeInTheDocument();
   });
