@@ -51,6 +51,52 @@ describe('SpaceListTable', () => {
     expect(screen.getAllByText('-')).toHaveLength(2);
   });
 
+  it('"층" 헤더 클릭 시 층 오름차순으로 정렬한다', async () => {
+    const user = userEvent.setup();
+    render(
+      <SpaceListTable
+        spaces={[
+          makeSpace({ id: 1, name: '3층방', floor: 3 }),
+          makeSpace({ id: 2, name: '1층방', floor: 1 }),
+          makeSpace({ id: 3, name: '2층방', floor: 2 }),
+        ]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    await user.click(screen.getByText('층'));
+
+    const rows = screen.getAllByRole('row').slice(1); // 헤더 제외
+    expect(rows[0]).toHaveTextContent('1층방');
+    expect(rows[1]).toHaveTextContent('2층방');
+    expect(rows[2]).toHaveTextContent('3층방');
+  });
+
+  it('"층" 헤더를 두 번 클릭하면 내림차순으로 정렬한다', async () => {
+    const user = userEvent.setup();
+    render(
+      <SpaceListTable
+        spaces={[
+          makeSpace({ id: 1, name: '1층방', floor: 1 }),
+          makeSpace({ id: 2, name: '3층방', floor: 3 }),
+          makeSpace({ id: 3, name: '2층방', floor: 2 }),
+        ]}
+        onEdit={vi.fn()}
+        onDelete={vi.fn()}
+      />,
+    );
+
+    const header = screen.getByText('층');
+    await user.click(header);
+    await user.click(header);
+
+    const rows = screen.getAllByRole('row').slice(1);
+    expect(rows[0]).toHaveTextContent('3층방');
+    expect(rows[1]).toHaveTextContent('2층방');
+    expect(rows[2]).toHaveTextContent('1층방');
+  });
+
   it('수정/삭제 클릭 시 해당 공간과 함께 콜백이 호출된다', async () => {
     const onEdit = vi.fn();
     const onDelete = vi.fn();

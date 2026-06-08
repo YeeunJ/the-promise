@@ -186,6 +186,52 @@ describe('BookingPage', () => {
     expect(screen.queryByText('예약 신청 취소')).not.toBeInTheDocument();
   });
 
+  it('마지막 단계에서 1단계(신청자) 정보가 무효하면 "신청 완료" 버튼이 비활성화된다', () => {
+    // 5단계 모두 도달했지만 신청자 정보가 비어 있는 상태 (이름을 지운 케이스)
+    localStorage.setItem(
+      BOOKING_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        draft: {
+          applicant: null,
+          space: { id: 1, buildingName: '본당', floor: 3, spaceName: '드림홀' },
+          headcount: 30,
+          timeSlot: { date: '2026-06-10', startTime: '10:00', endTime: '11:00' },
+          purpose: '청년부 모임',
+        },
+        maxReachedStep: 5,
+      }),
+    );
+    renderBookingPage();
+    expect(screen.getByRole('button', { name: /신청 완료/ })).toBeDisabled();
+  });
+
+  it('마지막 단계에서 모든 단계가 유효하면 "신청 완료" 버튼이 활성화된다', () => {
+    localStorage.setItem(
+      BOOKING_DRAFT_STORAGE_KEY,
+      JSON.stringify({
+        draft: {
+          applicant: {
+            name: '홍길동',
+            phone: '010-1234-5678',
+            departmentId: 1,
+            departmentName: '청년부',
+            teamId: 11,
+            teamName: '1청년',
+            customTeamName: null,
+            pastorDisplay: '',
+          },
+          space: { id: 1, buildingName: '본당', floor: 3, spaceName: '드림홀' },
+          headcount: 30,
+          timeSlot: { date: '2026-06-10', startTime: '10:00', endTime: '11:00' },
+          purpose: '청년부 모임',
+        },
+        maxReachedStep: 5,
+      }),
+    );
+    renderBookingPage();
+    expect(screen.getByRole('button', { name: /신청 완료/ })).not.toBeDisabled();
+  });
+
   it('localStorage draft 인원 → SummaryRail 에 표시', () => {
     localStorage.setItem(
       BOOKING_DRAFT_STORAGE_KEY,
