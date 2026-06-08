@@ -34,17 +34,10 @@ export function ConfirmDeleteDialog({
 
   if (!isOpen) return null;
 
-  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>): void {
-    if (e.target === e.currentTarget && !isLoading) {
-      onClose();
-    }
-  }
-
   return (
     <div
       data-testid="confirm-delete-overlay"
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-      onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-delete-title"

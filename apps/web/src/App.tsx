@@ -7,10 +7,13 @@ import ConfirmationPage from './pages/ConfirmationPage';
 import BookingSuccessPage from './pages/BookingSuccessPage';
 import BookingFailedPage from './pages/BookingFailedPage';
 import MyReservationsPage from './pages/MyReservationsPage';
+import BoardPage from './pages/BoardPage';
 
 export default function App(): JSX.Element {
   return (
     <Routes>
+      {/* 전체화면 공개 보드 (헤더/네비 없음, 로비 디스플레이용) */}
+      <Route path="/board" element={<BoardPage />} />
       <Route element={<AppShell />}>
         <Route path="/" element={<LandingPage />} />
         <Route path="/booking" element={<BookingPage />} />

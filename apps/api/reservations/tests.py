@@ -1076,3 +1076,108 @@ class AdminReservationCancelViewTest(BaseTestCase):
         r = self._make_reservation()
         response = self.client.post(f"/api/v1/admin/reservations/{r.pk}/cancel/", {}, format="json")
         self.assertEqual(response.status_code, 401)
+
+
+# ─── 실시간 예약 현황 보드 ──────────────────────────────────────────────────────
+
+class ReservationBoardViewTest(BaseTestCase):
+    """GET /api/v1/reservations/board/ — 현재 진행 중 + 2시간 내 시작 예약(건물별)."""
+
+    URL = "/api/v1/reservations/board/"
+
+    def _rel(self, start_min, end_min, space=None,
+             status=Reservation.Status.CONFIRMED, **kwargs):
+        """timezone.now() 기준 상대 시각으로 예약 생성."""
+        now = timezone.now()
+        defaults = dict(
+            space=space or self.space,
+            applicant_name="김믿음",
+            applicant_phone="01012345678",
+            custom_team_name="청년부",
+            leader_phone="01098765432",
+            headcount=10,
+            purpose="정기모임",
+            start_datetime=now + datetime.timedelta(minutes=start_min),
+            end_datetime=now + datetime.timedelta(minutes=end_min),
+            status=status,
+        )
+        defaults.update(kwargs)
+        return Reservation.objects.create(**defaults)
+
+    def _all_reservations(self, response):
+        return [r for b in response.data["buildings"] for r in b["reservations"]]
+
+    def test_returns_live_and_upcoming_only(self):
+        live     = self._rel(-30, 30)     # 진행 중
+        upcoming = self._rel(60, 120)     # 2시간 내 시작
+        self._rel(180, 240)               # 윈도우 밖(3시간 뒤) → 제외
+        self._rel(-120, -60)              # 지난 예약 → 제외
+
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, 200)
+        ids = [r["id"] for r in self._all_reservations(response)]
+        self.assertCountEqual(ids, [live.id, upcoming.id])
+
+    def test_state_field(self):
+        live     = self._rel(-30, 30)
+        upcoming = self._rel(60, 120)
+        response = self.client.get(self.URL)
+        states = {r["id"]: r["state"] for r in self._all_reservations(response)}
+        self.assertEqual(states[live.id], "live")
+        self.assertEqual(states[upcoming.id], "upcoming")
+
+    def test_excludes_cancelled_rejected_deleted(self):
+        self._rel(-30, 30, status=Reservation.Status.CANCELLED)
+        self._rel(-30, 30, status=Reservation.Status.REJECTED)
+        self._rel(-30, 30, is_deleted=True)
+        response = self.client.get(self.URL)
+        self.assertEqual(self._all_reservations(response), [])
+
+    def test_groups_by_active_building_only(self):
+        gn       = Building.objects.create(name="가나안홀", is_active=True)
+        gn_space = Space.objects.create(building=gn, name="에벤에셀홀", floor=-1, is_active=True)
+        Building.objects.create(name="비활성동", is_active=False)
+
+        self._rel(-30, 30, space=self.space)   # 본당
+        self._rel(60, 120, space=gn_space)     # 가나안홀
+
+        response = self.client.get(self.URL)
+        names = [b["name"] for b in response.data["buildings"]]
+        self.assertIn("본당", names)
+        self.assertIn("가나안홀", names)
+        self.assertNotIn("비활성동", names)
+
+    def test_empty_active_building_included_as_empty_list(self):
+        # 예약 없는 활성 건물도 탭/빈 상태용으로 빈 배열로 포함
+        Building.objects.create(name="무지개홀", is_active=True)
+        response = self.client.get(self.URL)
+        rainbow = next(b for b in response.data["buildings"] if b["name"] == "무지개홀")
+        self.assertEqual(rainbow["reservations"], [])
+
+    def test_window_minutes_param(self):
+        far = self._rel(150, 210)   # 150분 뒤 시작
+        default_ids = [r["id"] for r in self._all_reservations(self.client.get(self.URL))]
+        self.assertNotIn(far.id, default_ids)
+        wide_ids = [r["id"] for r in self._all_reservations(self.client.get(self.URL, {"window_minutes": 180}))]
+        self.assertIn(far.id, wide_ids)
+
+    def test_includes_now_and_window(self):
+        response = self.client.get(self.URL)
+        self.assertIn("now", response.data)
+        self.assertEqual(response.data["window_minutes"], 120)
+
+    def test_no_auth_required(self):
+        self.client.credentials()
+        response = self.client.get(self.URL)
+        self.assertEqual(response.status_code, 200)
+
+    def test_does_not_leak_private_fields(self):
+        self._rel(-30, 30)
+        response = self.client.get(self.URL)
+        all_res = self._all_reservations(response)
+        self.assertTrue(all_res)
+        sample = all_res[0]
+        for leaked in ("applicant_phone", "leader_phone", "admin_note", "headcount"):
+            self.assertNotIn(leaked, sample)
+        for present in ("applicant_team", "applicant_name", "purpose", "state", "space"):
+            self.assertIn(present, sample)

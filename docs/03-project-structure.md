@@ -134,6 +134,7 @@ apps/web/
 | `BookingSuccessPage.tsx` / `BookingFailedPage.tsx` | 신청 성공/실패 결과 |
 | `LookupLoginPage.tsx` | 내 예약 조회 로그인 (공용 PC 대응 재로그인) |
 | `MyReservationsPage.tsx` | 내 예약 목록 |
+| `BoardPage.tsx` | 실시간 예약 현황 보드 — 현재/다가올 예약 타임라인 (전체화면 공개, `/board`) |
 | `AdminPage.tsx` | 관리자 페이지 (달력/예약 목록/건물·공간·팀 관리) |
 
 ### src/components/ — UI 단위
@@ -146,6 +147,7 @@ apps/web/
 | `components/booking/steps/` | 5단계 각 화면 — `ApplicantStep`, `DateTimeStep`, `SpaceStep`, `HeadcountStep`, `PurposeStep` |
 | `components/booking/floorplan/` | 장소 평면도 미리보기 — `FloorPlanCard`, `MainBuilding1F`(인라인 SVG 도면), `floorPlanRegistry`(건물·층→도면 매핑) |
 | `components/my/` | 내 예약 화면 — `MyKpiRow`, `UserReservationDetailModal` |
+| `components/board/` | 실시간 현황 보드 — `BoardTimeline`(공간별 타임라인), `BoardRow`, `BuildingTabs`(건물 탭·자동전환·페이지 네비), `BoardEmpty`(빈 상태) |
 | `components/admin/` | 관리자 화면 — 달력(`CalendarGrid`), 목록(`ListTable`), 상세/취소 모달, 상단/사이드 내비 등 |
 | `components/admin/buildings/` · `spaces/` · `teams/` | 건물·공간·팀 CRUD 섹션(목록 테이블 + 폼 모달) |
 
@@ -155,8 +157,8 @@ apps/web/
 
 | 디렉토리 | 대표 파일 | 역할 |
 |----------|-----------|------|
-| `hooks/` | `useBookingDraft`, `useStepFlow`, `useSpaceAvailability`, `useDepartments`, `usePaginatedReservations`, `useAdminBuildings/Spaces/Teams`, `useToast` | 예약 흐름 상태, 데이터 패칭, 관리자 CRUD 훅 |
-| `lib/` | `constants`, `adminConstants`, `reservationUtils`, `checkSpaceAvailability` | 도메인 상수/로직 |
+| `hooks/` | `useBookingDraft`, `useStepFlow`, `useSpaceAvailability`, `useDepartments`, `usePaginatedReservations`, `useAdminBuildings/Spaces/Teams`, `useToast`, `useBoardData`(현황 보드 60초 폴링), `useBoardClock`(서버 시각 기준 초 단위 시계) | 예약 흐름 상태, 데이터 패칭, 관리자 CRUD, 현황 보드 훅 |
+| `lib/` | `constants`, `adminConstants`, `reservationUtils`, `checkSpaceAvailability`, `boardLayout`(보드 타임라인 위치·페이지 계산) | 도메인 상수/로직 |
 | `lib/adminApi/` | `buildings`, `spaces`, `teams`, `errors` | 관리자 CRUD API 호출 |
 | `utils/` | `formatDatetime`, `formatPhone`, `formatSpaceName`, `koreanHolidays`, `buildCompletedSteps` | 포맷/계산 순수 함수 |
 | `types/` | `index.ts`(공용), `booking.ts`(예약 흐름 도메인) | 공용 TypeScript 타입 |
@@ -166,7 +168,7 @@ apps/web/
 
 ### 라우팅
 
-`App.tsx` (사용자) — 모든 경로가 `AppShell` 레이아웃 하위:
+`App.tsx` (사용자) — `/board`(전체화면 공개 보드)를 제외한 모든 경로가 `AppShell` 레이아웃 하위:
 
 | path | 컴포넌트 |
 |------|----------|
@@ -176,6 +178,7 @@ apps/web/
 | `/booking/success` · `/booking/failed` | BookingSuccessPage · BookingFailedPage |
 | `/my/login` | LookupLoginPage |
 | `/my` | MyReservationsPage |
+| `/board` | BoardPage (전체화면 · `AppShell` 레이아웃 미적용, 로비 디스플레이용) |
 | `*` | `/`로 리다이렉트 |
 
 `AdminApp.tsx` (관리자, `admin.html` 진입) — `/`, `/admin.html` → `AdminPage`.
@@ -250,6 +253,7 @@ infra/
     reservations/                           ← 예약 생성
     reservations/current/                   ← 현재(예정) 예약 조회
     reservations/past/                      ← 지난 예약 조회
+    reservations/board/                     ← 실시간 현황 보드 (진행 중 + 2시간 내 시작, 건물별·공개)
     reservations/<id>/ticket/               ← 예약 QR 티켓 이미지
     reservations/<id>/cancel/               ← 예약 취소
     admin/

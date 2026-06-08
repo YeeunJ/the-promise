@@ -55,16 +55,13 @@ export function ReservationDetailModal({
 
   if (!reservation) return null;
 
-  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) onClose();
-  }
-
   const teamDisplay = reservation.applicant_team || reservation.custom_team_name || '-';
 
   return (
     <div
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
     >
       <div className="bg-white rounded-xl shadow-md border border-[#E5E7EB] w-full max-w-lg mx-4 flex flex-col max-h-[90vh]">
         {/* 헤더 */}

@@ -92,7 +92,7 @@ export function BookingPage(): JSX.Element {
                     title={step.title}
                     isActive={state === 'active'}
                     isFilled={flow.isStepValid(i + 1)}
-                    canAdvance={flow.isStepValid(i + 1)}
+                    canAdvance={i === 4 ? flow.isComplete : flow.isStepValid(i + 1)}
                     isLastStep={i === 4}
                     onAdvance={() => handleAdvance(i)}
                   >

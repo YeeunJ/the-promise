@@ -40,17 +40,12 @@ export function CancelDialog({ isOpen, onConfirm, onClose, isLoading }: CancelDi
     onConfirm(adminNote);
   }
 
-  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>) {
-    if (e.target === e.currentTarget) {
-      onClose();
-    }
-  }
-
   return (
     <div
       data-testid="cancel-dialog-overlay"
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-      onClick={handleOverlayClick}
+      role="dialog"
+      aria-modal="true"
     >
       <div
         data-testid="cancel-dialog-body"

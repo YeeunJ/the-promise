@@ -97,7 +97,7 @@ describe('CancelDialog', () => {
 
   // --- 오버레이 클릭 ---
 
-  it('오버레이 클릭 시 onClose를 호출한다', async () => {
+  it('오버레이 클릭 시 onClose를 호출하지 않는다', async () => {
     const onClose = vi.fn();
     const user = userEvent.setup();
     render(<CancelDialog {...defaultProps} onClose={onClose} />);
@@ -105,7 +105,7 @@ describe('CancelDialog', () => {
     const overlay = screen.getByTestId('cancel-dialog-overlay');
     await user.click(overlay);
 
-    expect(onClose).toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
   });
 
   it('다이얼로그 본체 클릭 시 onClose를 호출하지 않는다', async () => {

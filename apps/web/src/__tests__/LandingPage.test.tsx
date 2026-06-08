@@ -13,6 +13,7 @@ function renderLanding(): void {
         <Route path="/booking" element={<div data-testid="booking">Booking</div>} />
         <Route path="/my" element={<div data-testid="my">My</div>} />
         <Route path="/my/login" element={<div data-testid="login">Login</div>} />
+        <Route path="/board" element={<div data-testid="board">Board</div>} />
       </Routes>
     </MemoryRouter>,
   );
@@ -69,5 +70,11 @@ describe('LandingPage', () => {
     renderLanding();
     await userEvent.click(screen.getByRole('button', { name: '내 예약 조회' }));
     expect(screen.getByTestId('my')).toBeInTheDocument();
+  });
+
+  it('실시간 현황 배너가 /board로 이동한다', async () => {
+    renderLanding();
+    await userEvent.click(screen.getByRole('button', { name: /실시간 예약 현황 보드 열기/ }));
+    expect(screen.getByTestId('board')).toBeInTheDocument();
   });
 });

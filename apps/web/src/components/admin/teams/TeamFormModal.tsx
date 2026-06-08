@@ -94,17 +94,10 @@ export function TeamFormModal({
     await onSubmit(payload);
   }
 
-  function handleOverlayClick(e: React.MouseEvent<HTMLDivElement>): void {
-    if (e.target === e.currentTarget && !isSubmitting) {
-      onClose();
-    }
-  }
-
   return (
     <div
       data-testid="team-form-overlay"
       className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center"
-      onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
       aria-labelledby="team-form-title"
