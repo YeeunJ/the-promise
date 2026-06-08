@@ -25,7 +25,7 @@ export const INITIAL_BOOKING_DRAFT: BookingDraft = {
 export interface UseBookingDraftResult {
   draft: BookingDraft;
   maxReachedStep: number;
-  updateApplicant: (data: ApplicantData) => void;
+  updateApplicant: (data: ApplicantData | null) => void;
   updateSpace: (data: SpaceSelection) => void;
   updateHeadcount: (n: number) => void;
   updateTimeSlot: (slot: TimeSlotValue) => void;
@@ -134,7 +134,7 @@ export function useBookingDraft(): UseBookingDraftResult {
     persistOrClear(draft, maxReachedStep);
   }, [draft, maxReachedStep]);
 
-  const updateApplicant = useCallback((data: ApplicantData) => {
+  const updateApplicant = useCallback((data: ApplicantData | null) => {
     setDraftState((prev) => ({ ...prev, applicant: data }));
   }, []);
 
