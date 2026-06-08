@@ -1,5 +1,6 @@
-import { Building2, LogOut } from 'lucide-react';
+import { LogOut } from 'lucide-react';
 import type { AdminSection } from './SectionTabs';
+import canaanLogo from '../../assets/canaan-logo.svg';
 
 interface AdminTopNavProps {
   section: AdminSection;
@@ -24,15 +25,7 @@ export function AdminTopNav({
       <div className="mx-auto flex max-w-[1920px] items-center gap-5 px-10 py-[14px]">
         {/* Brand */}
         <div className="flex items-center gap-2.5">
-          <div
-            className="grid h-7 w-7 place-items-center rounded-[7px] bg-primary text-white"
-            aria-hidden="true"
-          >
-            <Building2 size={16} strokeWidth={1.8} />
-          </div>
-          <span className="text-[17px] font-extrabold tracking-[-0.02em] text-primary">
-            가나안교회
-          </span>
+          <img src={canaanLogo} alt="가나안교회" className="h-10 w-auto" />
           <span className="rounded-md bg-accent-soft px-2 py-0.5 text-[10px] font-extrabold tracking-[0.08em] text-[#8C6428]">
             ADMIN
           </span>

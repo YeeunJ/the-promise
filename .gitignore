@@ -33,6 +33,9 @@ Thumbs.db
 .bkit/
 .claude/
 
+# 디자인 원본 (대용량 .ai/.pdf 등)
+가나안교회 로고 원본_대외용/
+
 # 기타
 docs.zip
 docs/agent-handoff/

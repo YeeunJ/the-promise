@@ -1,6 +1,6 @@
 import { Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Building2 } from 'lucide-react';
 import { useLookupCredentials } from '../hooks/useLookupCredentials';
+import canaanLogo from '../assets/canaan-logo.svg';
 
 type ActiveTab = 'booking' | 'lookup' | null;
 
@@ -36,15 +36,11 @@ export function AppShell(): JSX.Element {
             aria-label="홈으로 이동"
             onClick={() => navigate('/')}
           >
-            <div
-              className="w-7 h-7 rounded-[7px] bg-primary grid place-items-center text-white"
-              aria-hidden="true"
-            >
-              <Building2 size={16} strokeWidth={1.8} />
-            </div>
-            <span className="font-extrabold text-[17px] tracking-[-0.02em] text-primary">
-              가나안교회
-            </span>
+            <img
+              src={canaanLogo}
+              alt="가나안교회"
+              className="h-10 w-auto"
+            />
           </div>
           <div className="w-px h-4 bg-edge" aria-hidden="true" />
           <span className="text-sm text-ink-soft tracking-[-0.01em]">장소 사용 신청</span>
