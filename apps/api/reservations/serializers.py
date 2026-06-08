@@ -77,6 +77,36 @@ class ReservationSerializer(serializers.ModelSerializer):
         return obj.team.name if obj.team else obj.custom_team_name
 
 
+class BoardSpaceSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = Space
+        fields = ["id", "name", "floor"]
+
+
+class BoardReservationSerializer(serializers.ModelSerializer):
+    """
+    실시간 현황 보드 전용 직렬화기.
+    무인 공개 화면용이므로 전화번호·인원·관리자메모 등 민감/불필요 정보는 노출하지 않는다.
+    """
+    space          = BoardSpaceSerializer(read_only=True)
+    applicant_team = serializers.SerializerMethodField()
+    state          = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Reservation
+        fields = [
+            "id", "space", "applicant_team", "applicant_name",
+            "purpose", "start_datetime", "end_datetime", "status", "state",
+        ]
+
+    def get_applicant_team(self, obj) -> str:
+        return obj.team.name if obj.team else obj.custom_team_name
+
+    def get_state(self, obj) -> str:
+        now = self.context.get("now") or timezone.now()
+        return "live" if obj.start_datetime <= now else "upcoming"
+
+
 class ReservationCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Reservation
