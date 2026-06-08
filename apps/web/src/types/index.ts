@@ -39,6 +39,34 @@ export interface Reservation {
   created_at: string;
 }
 
+// --- 실시간 예약 현황 보드 (/board) ---
+
+export type BoardState = 'live' | 'upcoming';
+
+export interface BoardReservation {
+  id: number;
+  space: { id: number; name: string; floor: number | null };
+  applicant_team: string;
+  applicant_name: string;
+  purpose: string;
+  start_datetime: string;
+  end_datetime: string;
+  status: ReservationStatus;
+  state: BoardState;
+}
+
+export interface BoardBuilding {
+  id: number;
+  name: string;
+  reservations: BoardReservation[];
+}
+
+export interface BoardResponse {
+  now: string;
+  window_minutes: number;
+  buildings: BoardBuilding[];
+}
+
 export interface ReservationFormData {
   space: number;
   applicant_name: string;

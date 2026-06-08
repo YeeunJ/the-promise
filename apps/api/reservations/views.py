@@ -25,6 +25,7 @@ from .serializers import (
     AdminSpaceWriteSerializer,
     AdminTeamSerializer,
     AdminTeamWriteSerializer,
+    BoardReservationSerializer,
     BuildingWithSpacesSerializer,
     DepartmentSerializer,
     ReservationCancelSerializer,
@@ -606,6 +607,72 @@ class ReservationPastListView(APIView):
             .order_by("-start_datetime")
         )
         return Response(_paginate(qs, request))
+
+
+class ReservationBoardView(APIView):
+    """
+    실시간 예약 현황 보드용 공개 엔드포인트 (비로그인).
+    진행 중(start <= now < end) + 앞으로 window_minutes(기본 120분) 내 시작하는
+    confirmed 예약을 활성 건물별로 묶어 반환한다.
+    개인정보(전화번호·관리자메모·인원)는 BoardReservationSerializer 에서 제외한다.
+    """
+
+    DEFAULT_WINDOW = 120
+    MAX_WINDOW     = 720
+
+    @extend_schema(
+        parameters=[
+            OpenApiParameter(
+                name="window_minutes", type=int, required=False,
+                description="다가올 예약 조회 범위(분). 기본 120, 최대 720",
+            ),
+        ],
+        responses={200: OpenApiResponse(description="건물별 현재/다가올 예약 목록 (서버 now 포함)")},
+    )
+    def get(self, request):
+        try:
+            window = int(request.query_params.get("window_minutes", self.DEFAULT_WINDOW))
+        except (TypeError, ValueError):
+            window = self.DEFAULT_WINDOW
+        window = max(1, min(window, self.MAX_WINDOW))
+
+        now     = timezone.now()
+        horizon = now + datetime.timedelta(minutes=window)
+
+        reservations = (
+            Reservation.objects
+            .filter(
+                status=Reservation.Status.CONFIRMED,
+                is_deleted=False,
+                start_datetime__lt=horizon,   # 이미 시작했거나 window 내 시작
+                end_datetime__gt=now,         # 아직 끝나지 않음
+            )
+            .select_related("space__building")
+            .order_by("space__floor", "start_datetime")
+        )
+
+        by_building: dict[int, list[Reservation]] = defaultdict(list)
+        for reservation in reservations:
+            by_building[reservation.space.building_id].append(reservation)
+
+        context   = {"now": now}
+        buildings = Building.objects.filter(is_active=True).order_by("name")
+        building_payload = [
+            {
+                "id":   building.id,
+                "name": building.name,
+                "reservations": BoardReservationSerializer(
+                    by_building.get(building.id, []), many=True, context=context,
+                ).data,
+            }
+            for building in buildings
+        ]
+
+        return Response({
+            "now":            now.isoformat(),
+            "window_minutes": window,
+            "buildings":      building_payload,
+        })
 
 
 class ReservationPublicCancelView(APIView):
