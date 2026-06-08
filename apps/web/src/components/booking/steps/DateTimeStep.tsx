@@ -150,9 +150,9 @@ export function DateTimeStep({ value, onChange }: DateTimeStepProps): JSX.Elemen
       next = { ...localValue, startTime: slot, endTime: '' };
     }
     setLocalValue(next);
-    if (next.date && next.startTime && next.endTime) {
-      onChangeRef.current(next);
-    }
+    // Always propagate so an incomplete re-selection (start chosen, end cleared)
+    // invalidates the parent draft and blocks advancing to the next step.
+    onChangeRef.current(next);
   }
 
   function handleDaySelect(date: Date | undefined): void {
@@ -197,6 +197,14 @@ export function DateTimeStep({ value, onChange }: DateTimeStepProps): JSX.Elemen
     ? computeDurationLabel(localValue.startTime, localValue.endTime)
     : '';
 
+  const timeGuide = !localValue.date
+    ? ''
+    : !localValue.startTime
+      ? '시작시간을 선택해주세요'
+      : !localValue.endTime
+        ? '종료시간을 선택해주세요'
+        : '';
+
   return (
     <div className="grid grid-cols-1 gap-6 md:grid-cols-[300px_minmax(0,1fr)]">
       {/* Calendar */}
@@ -234,11 +242,14 @@ export function DateTimeStep({ value, onChange }: DateTimeStepProps): JSX.Elemen
           <div className="text-[11px] font-bold uppercase tracking-[0.08em] text-accent">
             시간
           </div>
+          {timeGuide && (
+            <span className="text-xs font-medium text-danger">{timeGuide}</span>
+          )}
           {(localValue.startTime || localValue.endTime) && (
             <button
               type="button"
               onClick={handleTimeReset}
-              className="ml-auto text-xs font-medium text-ink-mute hover:text-danger transition-colors"
+              className="ml-auto rounded-full bg-primary-50 px-3 py-1 text-xs font-semibold text-primary hover:bg-primary-100 transition-colors"
             >
               선택 초기화
             </button>
@@ -303,10 +314,6 @@ export function DateTimeStep({ value, onChange }: DateTimeStepProps): JSX.Elemen
               <div className="flex items-center gap-1.5">
                 <span className="inline-block h-4 w-4 rounded-sm bg-primary-100" />
                 가능
-              </div>
-              <div className="flex items-center gap-1.5">
-                <span className="inline-block h-4 w-4 rounded-sm bg-edge" />
-                예약됨
               </div>
             </div>
           </>

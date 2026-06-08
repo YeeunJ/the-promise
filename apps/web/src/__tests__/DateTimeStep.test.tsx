@@ -65,6 +65,33 @@ describe('DateTimeStep', () => {
     });
   });
 
+  it('날짜만 선택 시 "시작시간을 선택해주세요" 안내 표시', () => {
+    render(<DateTimeStep value={dateOnly} onChange={vi.fn()} />);
+    expect(screen.getByText('시작시간을 선택해주세요')).toBeInTheDocument();
+  });
+
+  it('시작시간만 선택된 상태에서 "종료시간을 선택해주세요" 안내 표시', () => {
+    const startOnly: TimeSlotValue = {
+      date: '2099-12-31',
+      startTime: '2099-12-31T11:30:00+09:00',
+      endTime: '',
+    };
+    render(<DateTimeStep value={startOnly} onChange={vi.fn()} />);
+    expect(screen.getByText('종료시간을 선택해주세요')).toBeInTheDocument();
+    expect(screen.queryByText('시작시간을 선택해주세요')).not.toBeInTheDocument();
+  });
+
+  it('시작/종료 모두 선택되면 안내 메시지 없음', () => {
+    const filled: TimeSlotValue = {
+      date: '2099-12-31',
+      startTime: '2099-12-31T11:30:00+09:00',
+      endTime: '2099-12-31T15:00:00+09:00',
+    };
+    render(<DateTimeStep value={filled} onChange={vi.fn()} />);
+    expect(screen.queryByText('시작시간을 선택해주세요')).not.toBeInTheDocument();
+    expect(screen.queryByText('종료시간을 선택해주세요')).not.toBeInTheDocument();
+  });
+
   it('시작/종료 선택된 상태에서 duration pill 표시 (시간 + duration)', () => {
     const filled: TimeSlotValue = {
       date: '2099-12-31',
